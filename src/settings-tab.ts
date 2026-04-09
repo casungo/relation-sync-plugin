@@ -1,6 +1,7 @@
-import { type App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { type App, Modal, Notice, PluginSettingTab, Setting, TFile } from "obsidian";
 import type RelationSyncPlugin from "./main";
 import { DEFAULT_SETTINGS, type RelationPair } from "./types";
+import type { SyncLogEntry } from "./sync-engine";
 import {
   type CategoryId,
   t,
@@ -39,6 +40,48 @@ function categoryLabel(id: CategoryId | "custom"): string {
   return map[id];
 }
 
+// ── Sync Log Modal ────────────────────────────────────────────────────────
+
+class SyncLogModal extends Modal {
+  private readonly entries: SyncLogEntry[];
+
+  constructor(app: App, entries: SyncLogEntry[]) {
+    super(app);
+    this.entries = entries;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Sync Log" });
+
+    if (this.entries.length === 0) {
+      contentEl.createEl("p", { text: "No changes were made.", cls: "setting-item-description" });
+      return;
+    }
+
+    const table = contentEl.createEl("table", { cls: "relation-sync-log-table" });
+    const head = table.createEl("thead").createEl("tr");
+    head.createEl("th", { text: "File" });
+    head.createEl("th", { text: "Action" });
+    head.createEl("th", { text: "Key" });
+    head.createEl("th", { text: "Link" });
+
+    const tbody = table.createEl("tbody");
+    for (const e of this.entries) {
+      const tr = tbody.createEl("tr");
+      tr.createEl("td", { text: e.file.split("/").pop() ?? e.file });
+      tr.createEl("td", { text: e.action, cls: `sync-log-${e.action}` });
+      tr.createEl("td", { text: e.key });
+      tr.createEl("td", { text: e.link });
+    }
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 // ── Settings tab ─────────────────────────────────────────────────────────
 
 export class RelationSyncSettingTab extends PluginSettingTab {
@@ -65,7 +108,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       cls: "setting-item-description",
     });
 
-    // ── Action buttons ────────────────────────────────────────────────
+    // ── Reset ─────────────────────────────────────────────────────────
     new Setting(containerEl)
       .setName(strings.resetToDefaults)
       .setDesc(strings.resetToDefaultsDesc)
@@ -86,6 +129,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
           }),
       );
 
+    // ── Bulk Sync ─────────────────────────────────────────────────────
     new Setting(containerEl)
       .setName(strings.syncVault)
       .setDesc(strings.syncVaultDesc)
@@ -98,7 +142,45 @@ export class RelationSyncSettingTab extends PluginSettingTab {
 
     containerEl.createEl("hr");
 
-    // ── Show all languages toggle ─────────────────────────────────────
+    // ── Export pairs ──────────────────────────────────────────────────
+    new Setting(containerEl)
+      .setName(strings.exportPairs)
+      .setDesc(strings.exportPairsDesc)
+      .addButton((btn) =>
+        btn
+          .setButtonText(strings.exportPairsButton)
+          .onClick(() => void this.exportPairs()),
+      );
+
+    // ── Import pairs ──────────────────────────────────────────────────
+    new Setting(containerEl)
+      .setName(strings.importPairs)
+      .setDesc(strings.importPairsDesc)
+      .addButton((btn) =>
+        btn
+          .setButtonText(strings.importPairsButton)
+          .onClick(() => void this.importPairs()),
+      );
+
+    containerEl.createEl("hr");
+
+    // ── Exclude paths ─────────────────────────────────────────────────
+    new Setting(containerEl)
+      .setName(strings.excludePaths)
+      .setDesc(strings.excludePathsDesc)
+      .addText((text) =>
+        text
+          .setPlaceholder(strings.excludePathsPlaceholder)
+          .setValue(this.plugin.settings.excludePaths ?? "")
+          .onChange(async (val) => {
+            this.plugin.settings.excludePaths = val;
+            await this.plugin.saveSettings();
+          }),
+      );
+
+    containerEl.createEl("hr");
+
+    // ── Show all languages toggle ──────────────────────────────────────
     new Setting(containerEl)
       .setName(strings.showAllLanguages)
       .setDesc(strings.showAllLanguagesDesc)
@@ -109,7 +191,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         }),
       );
 
-    // ── Search / filter ───────────────────────────────────────────────
+    // ── Search / filter ────────────────────────────────────────────────
     const searchSetting = new Setting(containerEl).setName(
       strings.filterRelations,
     );
@@ -129,7 +211,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         .setButtonText(strings.addPairButton)
         .setCta()
         .onClick(async () => {
-          this.plugin.settings.relations.push({ forward: "", inverse: "" });
+          this.plugin.settings.relations.push({ forward: "", inverse: "", enabled: true });
           await this.plugin.saveSettings();
           this.searchQuery = "";
           this.display();
@@ -140,21 +222,21 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         }),
     );
 
-    // ── Count label ───────────────────────────────────────────────────
+    // ── Count label ────────────────────────────────────────────────────
     const countEl = containerEl.createEl("div", {
       cls: "relation-sync-count",
       text: strings.pairsTotal(this.plugin.settings.relations.length),
     });
 
-    // ── Scrollable relations list ─────────────────────────────────────
+    // ── Scrollable relations list ──────────────────────────────────────
     const listEl = containerEl.createDiv({ cls: "relation-sync-list" });
     this.renderRelations(listEl, countEl, locale);
 
-    // ── Inject styles (once) ──────────────────────────────────────────
+    // ── Inject styles (once) ───────────────────────────────────────────
     this.injectStyles(containerEl);
   }
 
-  // ── Render the grouped, filterable relation list ─────────────────────
+  // ── Render the grouped, filterable relation list ──────────────────────
 
   private renderRelations(
     container: HTMLElement,
@@ -245,7 +327,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     }
   }
 
-  // ── Single pair row ──────────────────────────────────────────────────
+  // ── Single pair row ───────────────────────────────────────────────────
 
   private renderPairRow(
     containerEl: HTMLElement,
@@ -253,8 +335,23 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     index: number,
   ): void {
     const strings = t();
+    const isEnabled = pair.enabled !== false;
     const setting = new Setting(containerEl);
     setting.settingEl.addClass("relation-sync-row");
+    if (!isEnabled) setting.settingEl.addClass("relation-sync-row--disabled");
+
+    // Enable / Disable toggle button
+    setting.addExtraButton((btn) =>
+      btn
+        .setIcon(isEnabled ? "check-circle" : "circle")
+        .setTooltip(strings.togglePairTooltip)
+        .onClick(async () => {
+          pair.enabled = !isEnabled;
+          await this.plugin.saveSettings();
+          // Re-render only this row's container
+          this.display();
+        }),
+    );
 
     // Forward key input
     setting.addText((text) =>
@@ -301,11 +398,82 @@ export class RelationSyncSettingTab extends PluginSettingTab {
 
   private async runBulkSync(): Promise<void> {
     const strings = t();
-    const count = await this.plugin.engine.runBulkSync();
+    const { count, log } = await this.plugin.engine.runBulkSync();
     new Notice(strings.syncNotice(count));
+    if (log.length > 0) {
+      new SyncLogModal(this.app, log).open();
+    }
   }
 
-  // ── Scoped CSS ───────────────────────────────────────────────────────
+  // ── Export pairs ──────────────────────────────────────────────────────
+
+  private async exportPairs(): Promise<void> {
+    const strings = t();
+    const json = JSON.stringify(this.plugin.settings.relations, null, 2);
+    const filename = "relation-sync-pairs.json";
+    try {
+      const existing = this.app.vault.getAbstractFileByPath(filename);
+      if (existing instanceof TFile) {
+        await this.app.vault.modify(existing, json);
+      } else {
+        await this.app.vault.create(filename, json);
+      }
+      new Notice(`RelationSync: exported to ${filename}`);
+    } catch (e) {
+      new Notice(strings.importError);
+      console.error("RelationSync export error:", e);
+    }
+  }
+
+  // ── Import pairs ──────────────────────────────────────────────────────
+
+  private async importPairs(): Promise<void> {
+    const strings = t();
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text) as unknown;
+        if (!Array.isArray(parsed)) throw new Error("Not an array");
+        const pairs = parsed.filter(
+          (p): p is RelationPair =>
+            typeof p === "object" &&
+            p !== null &&
+            typeof (p as RelationPair).forward === "string" &&
+            typeof (p as RelationPair).inverse === "string",
+        );
+
+        // Merge: skip duplicates by forward+inverse key
+        const existing = new Set(
+          this.plugin.settings.relations.map(
+            (r) => `${r.forward.toLowerCase()}|${r.inverse.toLowerCase()}`,
+          ),
+        );
+        let added = 0;
+        for (const pair of pairs) {
+          const key = `${pair.forward.toLowerCase()}|${pair.inverse.toLowerCase()}`;
+          if (!existing.has(key)) {
+            this.plugin.settings.relations.push(pair);
+            existing.add(key);
+            added++;
+          }
+        }
+        await this.plugin.saveSettings();
+        new Notice(strings.importSuccess(added));
+        this.display();
+      } catch (e) {
+        new Notice(strings.importError);
+        console.error("RelationSync import error:", e);
+      }
+    };
+    input.click();
+  }
+
+  // ── Scoped CSS ────────────────────────────────────────────────────────
 
   private injectStyles(containerEl: HTMLElement): void {
     if (containerEl.querySelector("style.relation-sync-styles")) return;
@@ -396,6 +564,12 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         font-size: var(--font-ui-smaller);
       }
 
+      /* ── Disabled row ──────────────────────────────────────────── */
+      .relation-sync-row--disabled .setting-item-control input[type="text"] {
+        opacity: 0.4;
+        text-decoration: line-through;
+      }
+
       /* ── Arrow ─────────────────────────────────────────────────── */
       .relation-sync-arrow {
         align-self: center;
@@ -412,6 +586,21 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         padding: 32px 16px;
         font-size: var(--font-ui-small);
       }
+
+      /* ── Sync log table ────────────────────────────────────────── */
+      .relation-sync-log-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: var(--font-ui-small);
+      }
+      .relation-sync-log-table th,
+      .relation-sync-log-table td {
+        padding: 4px 8px;
+        border-bottom: 1px solid var(--background-modifier-border);
+        text-align: left;
+      }
+      .sync-log-added  { color: var(--color-green, #4caf50); font-weight: 600; }
+      .sync-log-removed { color: var(--color-red, #f44336); font-weight: 600; }
     `;
   }
 }

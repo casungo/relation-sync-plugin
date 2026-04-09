@@ -32,13 +32,56 @@ export default class RelationSyncPlugin extends Plugin {
       }),
     );
 
+    // Rewrite backlinks when a file is renamed or moved.
+    this.registerEvent(
+      this.app.vault.on("rename", (file, oldPath) => {
+        if (file instanceof TFile) {
+          void this.engine.handleFileRenamed(file, oldPath);
+        }
+      }),
+    );
+
+    // ── Command palette ────────────────────────────────────────────────
+    this.addCommand({
+      id: "run-bulk-sync",
+      name: "Run bulk sync",
+      callback: () => {
+        void this.runBulkSyncCommand();
+      },
+    });
+
+    this.addCommand({
+      id: "cancel-bulk-sync",
+      name: "Cancel bulk sync",
+      callback: () => {
+        this.engine.cancelBulkSync();
+      },
+    });
+
+    this.addCommand({
+      id: "open-settings",
+      name: "Open settings",
+      callback: () => {
+        // Navigate to the plugin's settings pane
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this.app as any).setting?.open();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this.app as any).setting?.openTabById(this.manifest.id);
+      },
+    });
+
     this.addSettingTab(new RelationSyncSettingTab(this.app, this));
-    console.log("RelationSync: loaded");
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("RelationSync: loaded");
+    }
   }
 
   onunload(): void {
     this.engine.destroy();
-    console.log("RelationSync: unloaded");
+    if (process.env.NODE_ENV === "development") {
+      console.log("RelationSync: unloaded");
+    }
   }
 
   async loadSettings(): Promise<void> {
@@ -52,5 +95,19 @@ export default class RelationSyncPlugin extends Plugin {
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     this.engine.refreshMap(this.settings);
+  }
+
+  private async runBulkSyncCommand(): Promise<void> {
+    const { Notice } = await import("obsidian");
+    const notice = new Notice("RelationSync: bulk sync running…", 0);
+    try {
+      const { count } = await this.engine.runBulkSync();
+      notice.hide();
+      new Notice(`RelationSync: sync completed on ${count} notes.`);
+    } catch (e) {
+      notice.hide();
+      new Notice("RelationSync: bulk sync failed.");
+      console.error("RelationSync bulk sync error:", e);
+    }
   }
 }
