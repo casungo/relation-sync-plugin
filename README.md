@@ -1,173 +1,97 @@
-# Relation Sync — Obsidian Plugin
+# Relation Sync for Obsidian
 
-Automatically keeps **inverse relations** in sync across your vault's frontmatter.
+[![Release](https://img.shields.io/github/v/release/casungo/relation-sync-plugin?style=flat-square)](https://github.com/casungo/relation-sync-plugin/releases)
+[![Downloads](https://img.shields.io/github/downloads/casungo/relation-sync-plugin/total?style=flat-square)](https://github.com/casungo/relation-sync-plugin/releases)
 
-Write `son of: "[[John]]"` in a note and the plugin instantly adds `son: "[[YourNote]]"` in John's note. Remove the link and the inverse is cleaned up too.
-
-Ships with **50+ built-in relation pairs** covering family relationships in both **English** and **Italian** — and you can add any custom pair you need.
+**Relation Sync** is a powerful Obsidian plugin that automates the management of bidirectional relationships within your vault's YAML frontmatter. Stop manually updating back-references; define your logic once and let the plugin handle the rest.
 
 ---
 
-## How It Works
+## ✨ Key Features
 
-In **Alice.md**:
-```yaml
----
-daughter of: "[[Bob]]"
----
-```
+- **🔄 Automatic Bidirectional Syncing**: Add a relation in one note, and the inverse is instantly added to the target note.
+- **📚 Extensive Default Library**: Over 50+ pre-configured relation pairs covering Family, Romantic, Professional, and Creative relationships.
+- **🌍 Multi-Language Support**: Fully localized in **8 languages** (English, Italian, German, Spanish, French, Japanese, Portuguese, and Chinese).
+- **🛠️ Fully Customizable**: Define your own custom relation pairs (e.g., `Villain` ↔ `Hero`, `Master` ↔ `Apprentice`).
+- **📂 Multi-Value Aware**: Handles both single links and arrays of links seamlessly.
+- **⚡ Bulk Sync Tool**: A specialized tool to scan and synchronize your entire vault in one click.
+- **🎨 Modern Settings UI**: Grouped, searchable, and filterable interface for effortless configuration.
 
-The plugin automatically adds in **Bob.md**:
-```yaml
 ---
-daughter: "[[Alice]]"
+
+## 🚀 How It Works
+
+Imagine you are writing about your family. You add a link to your father in your note:
+
+```md
+John Doe.md:
 ---
-```
-
-If you remove the link from Alice, the inverse in Bob is removed as well.
-
-### Multiple Values
-
-Use YAML arrays for multiple relations:
-```yaml
----
-parent of:
-  - "[[Alice]]"
-  - "[[Charlie]]"
+father: [[David Doe]]
 ---
 ```
 
-Both Alice and Charlie will receive `child of: "[[YourNote]]"` in their frontmatter.
+**Relation Sync** will immediately detect this and update David's note:
 
+```md
+David Doe.md:
 ---
-
-## Built-in Relation Pairs
-
-### English
-
-| Forward Key | Inverse Key |
-|---|---|
-| `child of` | `child` |
-| `child` | `child of` |
-| `son of` | `son` |
-| `son` | `son of` |
-| `daughter of` | `daughter` |
-| `daughter` | `daughter of` |
-| `parent of` | `child of` |
-| `father of` | `child of` |
-| `mother of` | `child of` |
-| `wife of` | `husband of` |
-| `husband of` | `wife of` |
-| `spouse of` | `spouse of` |
-| `brother of` | `brother of` |
-| `sister of` | `sister of` |
-| `sibling of` | `sibling of` |
-| `grandchild of` | `grandchild` |
-| `grandchild` | `grandchild of` |
-| `grandparent of` | `grandchild of` |
-| `grandfather of` | `grandchild of` |
-| `grandmother of` | `grandchild of` |
-| `uncle of` | `nephew of` |
-| `aunt of` | `niece of` |
-| `nephew of` | `uncle of` |
-| `niece of` | `aunt of` |
-| `cousin of` | `cousin of` |
-
-### Italiano
-
-| Chiave | Inverso |
-|---|---|
-| `figlio di` | `figlio` |
-| `figlio` | `figlio di` |
-| `figlia di` | `figlia` |
-| `figlia` | `figlia di` |
-| `genitore di` | `figlio di` |
-| `padre di` | `figlio di` |
-| `madre di` | `figlio di` |
-| `moglie di` | `marito di` |
-| `marito di` | `moglie di` |
-| `coniuge di` | `coniuge di` |
-| `fratello di` | `fratello di` |
-| `sorella di` | `sorella di` |
-| `nipote di` | `nipote` |
-| `nipote` | `nipote di` |
-| `nonno di` | `nipote di` |
-| `nonna di` | `nipote di` |
-| `zio di` | `nipote di` |
-| `zia di` | `nipote di` |
-| `cugino di` | `cugino di` |
-| `cugina di` | `cugina di` |
-
-All pairs are fully **customizable** in *Settings → Relation Sync*. Add, remove, or edit any pair.
-
+child: [[John Doe]]
 ---
-
-## Installation
-
-### Manual
-
-1. Download `main.js`, `manifest.json`, and `styles.css` (if present) from the latest release
-2. Create the folder `.obsidian/plugins/relation-sync/` in your vault
-3. Copy the files into that folder
-4. Restart Obsidian and enable the plugin in *Settings → Community Plugins*
-
-### BRAT (Beta Reviewers Auto-update Tester)
-
-1. Install [BRAT](https://github.com/TfTHacker/obsidian42-brat) if you haven't
-2. Add this repo URL in BRAT settings
-3. Enable the plugin
-
----
-
-## Configuration
-
-Open *Settings → Relation Sync* to:
-
-- **View and edit** all relation pairs (forward ↔ inverse)
-- **Add custom pairs** for any domain (not just family trees!)
-- **Run a global sync** to re-compute inverse relations across the entire vault
-
----
-
-## Global Sync
-
-The **"Run global sync"** button in settings re-scans all notes and ensures every inverse relation is present. Useful after:
-
-- First installing the plugin on an existing vault
-- Adding new relation pairs to cover existing notes
-- Recovering from manual edits that broke symmetry
-
----
-
-## Build From Source
-
-```bash
-npm install
-npm run build
 ```
 
-Copy `main.js` and `manifest.json` to `.obsidian/plugins/relation-sync/` in your vault.
-
-### Development
-
-```bash
-npm run dev
-```
-
-Starts esbuild in watch mode — rebuilds automatically on save.
+If you later change or remove the link, the plugin updates the corresponding inverse relation automatically, ensuring your graph remains perfectly consistent.
 
 ---
 
-## Technical Notes
+## 📂 Supported Categories
 
-- **Debounced writes**: rapid edits are batched (300ms) to avoid I/O storms
-- **Loop guard**: files written by the plugin don't re-trigger the sync cycle
-- **Automatic cleanup**: removing a link removes the inverse in the target
-- **Case-insensitive**: `Son Of` and `son of` match the same relation
-- **Compatible with Obsidian 1.4+** (uses `frontmatterLinks` from the metadata cache)
+The plugin comes with a rich set of defaults grouped by category:
+
+| Category | Examples |
+| :--- | :--- |
+| **Family** | Parent ↔ Child, Siblings, Spouses, Cousins, Grandparents |
+| **Romantic** | Partner, Lover, Sweetheart, Ex-partner |
+| **Friendship** | Best Friend, Roommate, Childhood Friend |
+| **Professional** | Manager ↔ Employee, Colleague, Client ↔ Provider |
+| **Education** | Teacher ↔ Student, Classmate, Mentor ↔ Mentee |
+| **Creative** | Collaborator, Rival, Muse |
+| **Social** | Neighbor, Acquaintance, Roommate |
 
 ---
 
-## License
+## ⚙️ Installation
 
-MIT
+### Community Plugins (Recommended)
+1. Open **Settings** in Obsidian.
+2. Go to **Community plugins** and click **Browse**.
+3. Search for `Relation Sync`.
+4. Click **Install**, then **Enable**.
+
+### Manual Installation
+1. Download the latest `main.js`, `manifest.json`, and `styles.css` from the [Releases](https://github.com/casungo/relation-sync-plugin/releases) page.
+2. Create a folder named `relation-sync` in your vault's `.obsidian/plugins/` directory.
+3. Move the downloaded files into that folder.
+4. Reload Obsidian and enable the plugin in settings.
+
+---
+
+## 🛠️ Development
+
+If you want to build the plugin yourself or contribute:
+
+1. Clone the repository.
+2. Run `npm install` to install dependencies.
+3. Run `npm run dev` to start the build process in watch mode.
+4. Run `npm run build` for a production release.
+
+---
+
+## 🤝 Contributing & Support
+
+- **Bugs & Features**: Please open an issue on the [GitHub repository](https://github.com/casungo/relation-sync-plugin/issues).
+- **Localization**: If you'd like to help translate the plugin into more languages, contributions to the `src/locales` directory are welcome!
+- **Support**: If you find this plugin useful, consider [supporting development](https://casungo.top/donate).
+
+---
+
+Developed with ❤️ by [casungo](https://casungo.top)
