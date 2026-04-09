@@ -11,6 +11,8 @@
 export interface RelationPair {
   forward: string;
   inverse: string;
+  /** When false the pair is skipped during sync. Defaults to true. */
+  enabled?: boolean;
 }
 
 // ── Category IDs ─────────────────────────────────────────────────────────
@@ -43,6 +45,21 @@ export interface I18nStrings {
   syncVaultButton: string;
   syncNotice: (count: number) => string;
 
+  // ── Import / Export
+  exportPairs: string;
+  exportPairsDesc: string;
+  exportPairsButton: string;
+  importPairs: string;
+  importPairsDesc: string;
+  importPairsButton: string;
+  importSuccess: (count: number) => string;
+  importError: string;
+
+  // ── Exclude paths
+  excludePaths: string;
+  excludePathsDesc: string;
+  excludePathsPlaceholder: string;
+
   // ── Search / filter
   filterRelations: string;
   searchPlaceholder: string;
@@ -58,6 +75,7 @@ export interface I18nStrings {
   forwardPlaceholder: string;
   inversePlaceholder: string;
   removePairTooltip: string;
+  togglePairTooltip: string;
 
   // ── Empty state
   noSearchResults: string;

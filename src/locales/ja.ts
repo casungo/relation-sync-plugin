@@ -27,6 +27,22 @@ export const ja: LocaleDefinition = {
     syncVaultButton: "一括同期を実行",
     syncNotice: (count) => `RelationSync: ${count} 件のノートで同期が完了しました。`,
 
+    exportPairs: "関係ペアをエクスポート",
+    exportPairsDesc:
+      "現在の関係ペアをバウルトのルートにJSONファイルとして保存します。",
+    exportPairsButton: "JSONにエクスポート",
+    importPairs: "関係ペアをインポート",
+    importPairsDesc:
+      "JSONファイルから関係ペアを読み込みます（既存のペアとマージ）。",
+    importPairsButton: "JSONからインポート",
+    importSuccess: (count) => `RelationSync: ${count} ペアをインポートしました。`,
+    importError: "RelationSync: インポートに失敗しました—ファイルが無効または読み取れません。",
+
+    excludePaths: "除外パス",
+    excludePathsDesc:
+      "同期時に無視するフォルダまたはファイルのパスをカンマ区切りで指定（例: Templates, アーカイブ）。",
+    excludePathsPlaceholder: "Templates, アーカイブ, 日和ノート",
+
     filterRelations: "関係をフィルタリング",
     searchPlaceholder: "検索… (例: 友達, friend, ex)",
 
@@ -38,6 +54,7 @@ export const ja: LocaleDefinition = {
     forwardPlaceholder: "順方向 (例: の友達)",
     inversePlaceholder: "逆方向 (例: の友達)",
     removePairTooltip: "このペアを削除",
+    togglePairTooltip: "このペアを有効 / 無効化",
 
     noSearchResults: "検索条件に一致する関係が見つかりません。",
     noRelations: '関係が定義されていません。「+ ペアを追加」をクリックして作成してください。',

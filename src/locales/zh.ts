@@ -24,6 +24,22 @@ export const zh: LocaleDefinition = {
     syncVaultButton: "运行全局同步",
     syncNotice: (count) => `RelationSync: ${count} 个笔记同步完成。`,
 
+    exportPairs: "导出关系对",
+    exportPairsDesc:
+      "将所有当前关系对保存为仓库根目录下的 JSON 文件。",
+    exportPairsButton: "导出为 JSON",
+    importPairs: "导入关系对",
+    importPairsDesc:
+      "从 JSON 文件导入关系对（与现有对合并）。",
+    importPairsButton: "从 JSON 导入",
+    importSuccess: (count) => `RelationSync: 已导入 ${count} 对关系。`,
+    importError: "导入失败 — 文件无效或无法读取。",
+
+    excludePaths: "排除路径",
+    excludePathsDesc:
+      "同步时要忽略的文件夹或文件路径，用逗号分隔（如 Templates, 归档）。",
+    excludePathsPlaceholder: "Templates, 归档, 日记",
+
     filterRelations: "筛选关系",
     searchPlaceholder: "搜索…（例如：朋友, friend, ex）",
 
@@ -35,6 +51,7 @@ export const zh: LocaleDefinition = {
     forwardPlaceholder: "正向（例如：的朋友）",
     inversePlaceholder: "反向（例如：的朋友）",
     removePairTooltip: "删除此关系对",
+    togglePairTooltip: "启用 / 禁用此关系对",
 
     noSearchResults: "未找到匹配你的搜索的关系。",
     noRelations: "未定义关系。点击「+ 添加关系对」来创建一个。",

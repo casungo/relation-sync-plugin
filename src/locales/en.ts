@@ -30,6 +30,22 @@ export const en: LocaleDefinition = {
     syncVaultButton: "Run global sync",
     syncNotice: (count) => `RelationSync: sync completed on ${count} notes.`,
 
+    exportPairs: "Export relation pairs",
+    exportPairsDesc:
+      "Save all current relation pairs to a JSON file in your vault root.",
+    exportPairsButton: "Export to JSON",
+    importPairs: "Import relation pairs",
+    importPairsDesc:
+      "Load relation pairs from a JSON file (merges with existing pairs).",
+    importPairsButton: "Import from JSON",
+    importSuccess: (count) => `RelationSync: imported ${count} pairs.`,
+    importError: "RelationSync: import failed — invalid or unreadable file.",
+
+    excludePaths: "Exclude paths",
+    excludePathsDesc:
+      "Comma-separated folder or file paths to ignore during sync (e.g. Templates, Archive/old).",
+    excludePathsPlaceholder: "Templates, Archive, Daily Notes",
+
     filterRelations: "Filter relations",
     searchPlaceholder: "Search… (e.g. friend, amico, ex)",
 
@@ -41,6 +57,7 @@ export const en: LocaleDefinition = {
     forwardPlaceholder: "forward (e.g. friend of)",
     inversePlaceholder: "inverse (e.g. friend of)",
     removePairTooltip: "Remove this pair",
+    togglePairTooltip: "Enable / disable this pair",
 
     noSearchResults: "No relations match your search.",
     noRelations: 'No relations defined. Click "+ Add pair" to create one.',

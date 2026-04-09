@@ -27,6 +27,22 @@ export const fr: LocaleDefinition = {
     syncVaultButton: "Lancer la synchronisation globale",
     syncNotice: (count) => `RelationSync : synchronisation terminée sur ${count} notes.`,
 
+    exportPairs: "Exporter les paires de relations",
+    exportPairsDesc:
+      "Enregistre toutes les paires de relations actuelles dans un fichier JSON à la racine du coffre.",
+    exportPairsButton: "Exporter en JSON",
+    importPairs: "Importer des paires de relations",
+    importPairsDesc:
+      "Charge des paires de relations depuis un fichier JSON (fusionne avec les paires existantes).",
+    importPairsButton: "Importer depuis JSON",
+    importSuccess: (count) => `RelationSync : ${count} paires importées.`,
+    importError: "RelationSync : échec de l'importation — fichier invalide ou illisible.",
+
+    excludePaths: "Chemins exclus",
+    excludePathsDesc:
+      "Chemins de dossiers ou fichiers séparés par des virgules à ignorer lors de la synchronisation (ex. Templates, Archives).",
+    excludePathsPlaceholder: "Templates, Archives, Notes Quotidiennes",
+
     filterRelations: "Filtrer les relations",
     searchPlaceholder: "Rechercher… (ex: ami, friend, ex)",
 
@@ -38,6 +54,7 @@ export const fr: LocaleDefinition = {
     forwardPlaceholder: "direct (ex: ami de)",
     inversePlaceholder: "inverse (ex: ami de)",
     removePairTooltip: "Supprimer cette paire",
+    togglePairTooltip: "Activer / désactiver cette paire",
 
     noSearchResults: "Aucune relation ne correspond à votre recherche.",
     noRelations: 'Aucune relation définie. Cliquez sur "+ Ajouter une paire" pour en créer une.',

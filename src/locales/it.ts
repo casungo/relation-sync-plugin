@@ -31,6 +31,22 @@ export const it: LocaleDefinition = {
     syncNotice: (count) =>
       `RelationSync: sincronizzazione completata su ${count} note.`,
 
+    exportPairs: "Esporta coppie di relazioni",
+    exportPairsDesc:
+      "Salva tutte le coppie di relazioni attuali in un file JSON nella radice del vault.",
+    exportPairsButton: "Esporta in JSON",
+    importPairs: "Importa coppie di relazioni",
+    importPairsDesc:
+      "Carica coppie di relazioni da un file JSON (unisce alle coppie esistenti).",
+    importPairsButton: "Importa da JSON",
+    importSuccess: (count) => `RelationSync: importate ${count} coppie.`,
+    importError: "RelationSync: importazione fallita — file non valido o illeggibile.",
+
+    excludePaths: "Percorsi esclusi",
+    excludePathsDesc:
+      "Percorsi di cartelle o file separati da virgola da ignorare durante la sincronizzazione (es. Templates, Archivio).",
+    excludePathsPlaceholder: "Templates, Archivio, Note Giornaliere",
+
     filterRelations: "Filtra relazioni",
     searchPlaceholder: "Cerca… (es. amico, friend, ex)",
 
@@ -42,6 +58,7 @@ export const it: LocaleDefinition = {
     forwardPlaceholder: "diretto (es. amico di)",
     inversePlaceholder: "inverso (es. amico di)",
     removePairTooltip: "Rimuovi questa coppia",
+    togglePairTooltip: "Abilita / disabilita questa coppia",
 
     noSearchResults: "Nessuna relazione corrisponde alla ricerca.",
     noRelations:
