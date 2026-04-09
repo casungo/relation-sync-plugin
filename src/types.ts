@@ -9,8 +9,14 @@ import type { RelationPair } from "./locales/types";
 
 export interface RelationSyncSettings {
   relations: RelationPair[];
+  /**
+   * Comma-separated list of folder/file paths to exclude from syncing.
+   * E.g. "Templates, Archive/old"
+   */
+  excludePaths: string;
 }
 
 export const DEFAULT_SETTINGS: RelationSyncSettings = {
   relations: getAllRelations(),
+  excludePaths: "",
 };
