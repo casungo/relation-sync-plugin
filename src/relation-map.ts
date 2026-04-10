@@ -12,14 +12,17 @@ export function buildRelationMap(
   for (const pair of relations) {
     // Skip disabled pairs
     if (pair.enabled === false) continue;
-    const fwd = pair.forward.trim().toLowerCase();
-    const inv = pair.inverse.trim().toLowerCase();
-    if (fwd && inv) {
-      map.set(fwd, inv);
+    const fwdKey = pair.forward.trim().toLowerCase();
+    const invKey = pair.inverse.trim().toLowerCase();
+    const fwdVal = pair.forward.trim();
+    const invVal = pair.inverse.trim();
+    
+    if (fwdKey && invKey) {
+      map.set(fwdKey, invVal);
       // Always register the inverse direction so symmetric and asymmetric
       // pairs are both handled no matter which note the user edits first.
-      if (!map.has(inv)) {
-        map.set(inv, fwd);
+      if (!map.has(invKey)) {
+        map.set(invKey, fwdVal);
       }
     }
   }

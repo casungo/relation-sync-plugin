@@ -366,10 +366,20 @@ export class SyncEngine {
       await this.app.fileManager.processFrontMatter(
         target,
         (fm: Record<string, unknown>) => {
-          const existing = fm[inverseKey];
+          // Find case-insensitive match for the key if it already exists
+          let actualKey = inverseKey;
+          const lowerInverse = inverseKey.toLowerCase();
+          for (const k of Object.keys(fm)) {
+            if (k.toLowerCase() === lowerInverse) {
+              actualKey = k;
+              break;
+            }
+          }
+
+          const existing = fm[actualKey];
 
           if (existing === undefined || existing === null) {
-            fm[inverseKey] = sourceLink;
+            fm[actualKey] = sourceLink;
           } else if (Array.isArray(existing)) {
             const alreadyPresent = existing.some(
               (v: unknown) =>
@@ -380,7 +390,7 @@ export class SyncEngine {
             typeof existing === "string" &&
             !linksEqual(existing, sourceLink)
           ) {
-            fm[inverseKey] = [existing, sourceLink];
+            fm[actualKey] = [existing, sourceLink];
           }
         },
       );
@@ -415,7 +425,17 @@ export class SyncEngine {
       await this.app.fileManager.processFrontMatter(
         target,
         (fm: Record<string, unknown>) => {
-          const existing = fm[inverseKey];
+          // Find case-insensitive match for the key if it already exists
+          let actualKey = inverseKey;
+          const lowerInverse = inverseKey.toLowerCase();
+          for (const k of Object.keys(fm)) {
+            if (k.toLowerCase() === lowerInverse) {
+              actualKey = k;
+              break;
+            }
+          }
+
+          const existing = fm[actualKey];
           if (existing === undefined || existing === null) return;
 
           if (Array.isArray(existing)) {
@@ -424,17 +444,17 @@ export class SyncEngine {
                 !(typeof v === "string" && linksEqual(v, sourceLink)),
             );
             if (filtered.length === 0) {
-              delete fm[inverseKey];
+              delete fm[actualKey];
             } else if (filtered.length === 1) {
-              fm[inverseKey] = filtered[0];
+              fm[actualKey] = filtered[0];
             } else {
-              fm[inverseKey] = filtered;
+              fm[actualKey] = filtered;
             }
           } else if (
             typeof existing === "string" &&
             linksEqual(existing, sourceLink)
           ) {
-            delete fm[inverseKey];
+            delete fm[actualKey];
           }
         },
       );
