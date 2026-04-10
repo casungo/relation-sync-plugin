@@ -47,20 +47,20 @@ export const en: LocaleDefinition = {
     excludePathsPlaceholder: "Templates, archive, daily notes",
 
     filterRelations: "Filter relations",
-    searchPlaceholder: "Search… (e.g. friend, amico, ex)",
+    searchPlaceholder: "Search (e.g. friend, amico, ex)",
 
     addPairButton: "Add pair",
 
     pairsTotal: (count) => `${count} pairs total`,
     pairsShown: (visible, total) => `${visible} / ${total} pairs shown`,
 
-    forwardPlaceholder: "forward (e.g. friend of)",
-    inversePlaceholder: "inverse (e.g. friend of)",
+    forwardPlaceholder: "Forward (e.g. friend of)",
+    inversePlaceholder: "Inverse (e.g. friend of)",
     removePairTooltip: "Remove this pair",
     togglePairTooltip: "Enable/disable this pair",
 
     noSearchResults: "No relations match your search.",
-    noRelations: 'No relations defined. Click "+ Add pair" to create one.',
+    noRelations: 'No relations defined. Click "Add pair" to create one.',
 
     showAllLanguages: "Show all languages",
     showAllLanguagesDesc:
