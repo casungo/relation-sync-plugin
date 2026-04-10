@@ -64,7 +64,6 @@ export function detectLocale(): string {
 /** Return the `LocaleDefinition` for the current Obsidian locale. */
 export function getLocale(code?: string): LocaleDefinition {
   const key = code ?? detectLocale();
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- "en" is always registered
   return LOCALES[key] ?? LOCALES["en"]!;
 }
 

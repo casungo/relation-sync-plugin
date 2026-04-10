@@ -63,24 +63,23 @@ export default class RelationSyncPlugin extends Plugin {
       name: "Open settings",
       callback: () => {
         // Navigate to the plugin's settings pane
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.app as any).setting?.open();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.app as any).setting?.openTabById(this.manifest.id);
+        const appWithSetting = this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } };
+        appWithSetting.setting?.open();
+        appWithSetting.setting?.openTabById(this.manifest.id);
       },
     });
 
     this.addSettingTab(new RelationSyncSettingTab(this.app, this));
 
     if (process.env.NODE_ENV === "development") {
-      console.log("RelationSync: loaded");
+      console.debug("RelationSync: loaded");
     }
   }
 
   onunload(): void {
     this.engine.destroy();
     if (process.env.NODE_ENV === "development") {
-      console.log("RelationSync: unloaded");
+      console.debug("RelationSync: unloaded");
     }
   }
 
@@ -99,14 +98,14 @@ export default class RelationSyncPlugin extends Plugin {
 
   private async runBulkSyncCommand(): Promise<void> {
     const { Notice } = await import("obsidian");
-    const notice = new Notice("RelationSync: bulk sync running…", 0);
+    const notice = new Notice("Relation sync: bulk sync running…", 0);
     try {
       const { count } = await this.engine.runBulkSync();
       notice.hide();
-      new Notice(`RelationSync: sync completed on ${count} notes.`);
+      new Notice(`Relation sync: sync completed on ${count} notes.`);
     } catch (e) {
       notice.hide();
-      new Notice("RelationSync: bulk sync failed.");
+      new Notice("Relation sync: bulk sync failed.");
       console.error("RelationSync bulk sync error:", e);
     }
   }
