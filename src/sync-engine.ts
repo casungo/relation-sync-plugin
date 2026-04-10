@@ -1,7 +1,7 @@
 import { type App, type CachedMetadata, Notice, TFile } from "obsidian";
 import type { RelationSyncSettings } from "./types";
 import { buildRelationMap } from "./relation-map";
-import { debounce, linksEqual, parseWikiLinks } from "./utils";
+import { debounce, linksEqual, parseWikiLinks, matchCasing } from "./utils";
 
 /** Typed representation of Obsidian's frontmatter link entry (available 1.4+). */
 interface FrontmatterLinkEntry {
@@ -280,6 +280,12 @@ export class SyncEngine {
       const inverseKey = this.relationMap.get(key);
       if (!inverseKey) continue;
 
+      // Find original casing in `fm` or `prev`
+      // We look for the exact string the user typed so we can reflect its casing
+      const originalKey = Object.keys(fm).find((k) => k.toLowerCase() === key) ?? 
+                          Object.keys(prev).find((k) => k.toLowerCase() === key) ?? key;
+      const dynamicInverseKey = matchCasing(originalKey, inverseKey);
+
       const currentLinks = this.getLinksViaCache(cache, key);
       const prevLinks = this.getLinksFromRaw(prev, key);
 
@@ -291,10 +297,10 @@ export class SyncEngine {
       );
 
       for (const name of added) {
-        await this.addInverse(file, name, inverseKey);
+        await this.addInverse(file, name, dynamicInverseKey);
       }
       for (const name of removed) {
-        await this.removeInverse(file, name, inverseKey);
+        await this.removeInverse(file, name, dynamicInverseKey);
       }
     }
 

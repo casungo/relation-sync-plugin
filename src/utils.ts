@@ -24,6 +24,27 @@ export function linksEqual(a: string, b: string): boolean {
 }
 
 /**
+ * Adapt the casing of `target` to match `source`.
+ */
+export function matchCasing(source: string, target: string): string {
+  if (!source || !target) return target;
+
+  if (source === source.toLowerCase()) return target.toLowerCase();
+  if (source === source.toUpperCase()) return target.toUpperCase();
+
+  // If source starts with a capital letter
+  if (source.charAt(0) === source.charAt(0).toUpperCase()) {
+    // If the rest of the source string is lowercase (e.g. "Child of")
+    if (source.slice(1) === source.slice(1).toLowerCase()) {
+      return target.charAt(0).toUpperCase() + target.slice(1).toLowerCase();
+    }
+  }
+
+  // Fallback to configured target casing
+  return target;
+}
+
+/**
  * Trailing-edge debounce that returns a callable with a `.cancel()` handle.
  * Calls `fn` after `ms` milliseconds of inactivity.
  */
