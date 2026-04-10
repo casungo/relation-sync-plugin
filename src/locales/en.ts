@@ -10,7 +10,7 @@ export const en: LocaleDefinition = {
 
   // ── UI strings ─────────────────────────────────────────────────────────
   strings: {
-    pluginTitle: "Relation Sync",
+    pluginTitle: "Relation sync",
     pluginDescription:
       'Define inverse relation pairs. When you write "forward: [[Target]]" ' +
       "in a note's frontmatter, the plugin automatically adds " +
@@ -21,7 +21,7 @@ export const en: LocaleDefinition = {
       "Delete all custom changes and restore the built-in relation set.",
     resetToDefaultsButton: "Reset to defaults",
     resetConfirm:
-      "This will replace ALL your current relations with the built-in defaults.\n\nContinue?",
+      "This will replace all your current relations with the built-in defaults.\n\nContinue?",
     resetNotice: "RelationSync: relations reset to defaults.",
 
     syncVault: "Sync entire vault",
@@ -44,12 +44,12 @@ export const en: LocaleDefinition = {
     excludePaths: "Exclude paths",
     excludePathsDesc:
       "Comma-separated folder or file paths to ignore during sync (e.g. Templates, Archive/old).",
-    excludePathsPlaceholder: "Templates, Archive, Daily Notes",
+    excludePathsPlaceholder: "Templates, archive, daily notes",
 
     filterRelations: "Filter relations",
     searchPlaceholder: "Search… (e.g. friend, amico, ex)",
 
-    addPairButton: "+ Add pair",
+    addPairButton: "Add pair",
 
     pairsTotal: (count) => `${count} pairs total`,
     pairsShown: (visible, total) => `${visible} / ${total} pairs shown`,
@@ -57,7 +57,7 @@ export const en: LocaleDefinition = {
     forwardPlaceholder: "forward (e.g. friend of)",
     inversePlaceholder: "inverse (e.g. friend of)",
     removePairTooltip: "Remove this pair",
-    togglePairTooltip: "Enable / disable this pair",
+    togglePairTooltip: "Enable/disable this pair",
 
     noSearchResults: "No relations match your search.",
     noRelations: 'No relations defined. Click "+ Add pair" to create one.',
@@ -68,7 +68,7 @@ export const en: LocaleDefinition = {
 
     catFamily: "👨‍👩‍👧‍👦 Family",
     catRomantic: "💕 Romantic",
-    catFriendship: "🤝 Friendship & Social",
+    catFriendship: "🤝 Friendship & social",
     catProfessional: "💼 Professional",
     catEducation: "🎓 Education",
     catCreative: "🎨 Creative",
