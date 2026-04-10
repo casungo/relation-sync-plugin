@@ -53,7 +53,7 @@ class SyncLogModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Sync Log" });
+    contentEl.createEl("h2", { text: "Sync log" });
 
     if (this.entries.length === 0) {
       contentEl.createEl("p", { text: "No changes were made.", cls: "setting-item-description" });
@@ -82,6 +82,24 @@ class SyncLogModal extends Modal {
   }
 }
 
+class ConfirmModal extends Modal {
+  constructor(app: App, private message: string, private onConfirm: () => void) {
+    super(app);
+  }
+  onOpen() {
+    this.contentEl.createEl("p", { text: this.message });
+    new Setting(this.contentEl)
+      .addButton(btn => btn.setButtonText("Cancel").onClick(() => this.close()))
+      .addButton(btn => btn.setButtonText("Confirm").setWarning().onClick(() => {
+        this.onConfirm();
+        this.close();
+      }));
+  }
+  onClose() {
+    this.contentEl.empty();
+  }
+}
+
 // ── Settings tab ─────────────────────────────────────────────────────────
 
 export class RelationSyncSettingTab extends PluginSettingTab {
@@ -102,11 +120,10 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     const locale = detectLocale();
 
     // ── Header ────────────────────────────────────────────────────────
-    containerEl.createEl("h2", { text: strings.pluginTitle });
-    containerEl.createEl("p", {
-      text: strings.pluginDescription,
-      cls: "setting-item-description",
-    });
+    new Setting(containerEl)
+      .setName(strings.pluginTitle)
+      .setDesc(strings.pluginDescription)
+      .setHeading();
 
     // ── Reset ─────────────────────────────────────────────────────────
     new Setting(containerEl)
@@ -116,16 +133,15 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         btn
           .setButtonText(strings.resetToDefaultsButton)
           .setWarning()
-          .onClick(async () => {
-            const confirmed = confirm(strings.resetConfirm);
-            if (!confirmed) return;
-
-            this.plugin.settings = JSON.parse(
-              JSON.stringify(DEFAULT_SETTINGS),
-            );
-            await this.plugin.saveSettings();
-            new Notice(strings.resetNotice);
-            this.display();
+          .onClick(() => {
+            new ConfirmModal(this.app, strings.resetConfirm, async () => {
+              this.plugin.settings = JSON.parse(
+                JSON.stringify(DEFAULT_SETTINGS),
+              );
+              await this.plugin.saveSettings();
+              new Notice(strings.resetNotice);
+              this.display();
+            }).open();
           }),
       );
 
@@ -231,9 +247,6 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     // ── Scrollable relations list ──────────────────────────────────────
     const listEl = containerEl.createDiv({ cls: "relation-sync-list" });
     this.renderRelations(listEl, countEl, locale);
-
-    // ── Inject styles (once) ───────────────────────────────────────────
-    this.injectStyles(containerEl);
   }
 
   // ── Render the grouped, filterable relation list ──────────────────────
@@ -427,7 +440,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
 
   // ── Import pairs ──────────────────────────────────────────────────────
 
-  private async importPairs(): Promise<void> {
+  private importPairs(): void {
     const strings = t();
     const input = document.createElement("input");
     input.type = "file";
@@ -471,136 +484,5 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       }
     };
     input.click();
-  }
-
-  // ── Scoped CSS ────────────────────────────────────────────────────────
-
-  private injectStyles(containerEl: HTMLElement): void {
-    if (containerEl.querySelector("style.relation-sync-styles")) return;
-
-    const style = containerEl.createEl("style");
-    style.addClass("relation-sync-styles");
-    style.textContent = /* css */ `
-      /* ── Scrollable list container ─────────────────────────────── */
-      .relation-sync-list {
-        max-height: 55vh;
-        overflow-y: auto;
-        border: 1px solid var(--background-modifier-border);
-        border-radius: var(--radius-m, 8px);
-        padding: 6px;
-        margin-top: 6px;
-      }
-
-      /* ── Count label ───────────────────────────────────────────── */
-      .relation-sync-count {
-        font-size: var(--font-ui-smaller);
-        color: var(--text-muted);
-        padding: 4px 0;
-        text-align: right;
-      }
-
-      /* ── Category accordion ────────────────────────────────────── */
-      .relation-sync-category {
-        margin-bottom: 4px;
-        border-radius: var(--radius-s, 6px);
-        overflow: hidden;
-      }
-
-      .relation-sync-category > summary {
-        cursor: pointer;
-        padding: 6px 12px;
-        border-radius: var(--radius-s, 6px);
-        background: var(--background-secondary);
-        font-weight: 600;
-        font-size: var(--font-ui-small);
-        user-select: none;
-        list-style: none;
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        transition: background 0.15s ease;
-      }
-      .relation-sync-category > summary::-webkit-details-marker { display: none; }
-      .relation-sync-category > summary::before {
-        content: "▸";
-        display: inline-block;
-        margin-right: 6px;
-        transition: transform 0.15s ease;
-      }
-      .relation-sync-category[open] > summary::before {
-        transform: rotate(90deg);
-      }
-      .relation-sync-category > summary:hover {
-        background: var(--background-modifier-hover);
-      }
-
-      .relation-sync-cat-count {
-        opacity: 0.45;
-        font-weight: 400;
-      }
-
-      .relation-sync-rows {
-        padding: 2px 0 2px 8px;
-      }
-
-      /* ── Compact pair row ──────────────────────────────────────── */
-      .relation-sync-row {
-        padding: 2px 4px !important;
-        border-bottom: none !important;
-        min-height: unset !important;
-      }
-      .relation-sync-row .setting-item-info {
-        display: none !important;
-      }
-      .relation-sync-row .setting-item-control {
-        width: 100%;
-        gap: 4px;
-        flex-wrap: nowrap;
-      }
-      .relation-sync-row .setting-item-control input[type="text"] {
-        flex: 1;
-        min-width: 0;
-        padding: 4px 8px;
-        font-size: var(--font-ui-smaller);
-      }
-
-      /* ── Disabled row ──────────────────────────────────────────── */
-      .relation-sync-row--disabled .setting-item-control input[type="text"] {
-        opacity: 0.4;
-        text-decoration: line-through;
-      }
-
-      /* ── Arrow ─────────────────────────────────────────────────── */
-      .relation-sync-arrow {
-        align-self: center;
-        margin: 0 2px;
-        opacity: 0.4;
-        flex-shrink: 0;
-        font-size: var(--font-ui-smaller);
-      }
-
-      /* ── Empty state ───────────────────────────────────────────── */
-      .relation-sync-empty {
-        text-align: center;
-        opacity: 0.45;
-        padding: 32px 16px;
-        font-size: var(--font-ui-small);
-      }
-
-      /* ── Sync log table ────────────────────────────────────────── */
-      .relation-sync-log-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: var(--font-ui-small);
-      }
-      .relation-sync-log-table th,
-      .relation-sync-log-table td {
-        padding: 4px 8px;
-        border-bottom: 1px solid var(--background-modifier-border);
-        text-align: left;
-      }
-      .sync-log-added  { color: var(--color-green, #4caf50); font-weight: 600; }
-      .sync-log-removed { color: var(--color-red, #f44336); font-weight: 600; }
-    `;
   }
 }
