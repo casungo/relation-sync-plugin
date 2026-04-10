@@ -6,7 +6,7 @@ import type { LocaleDefinition } from "./types";
  * Contains all UI strings and the default relation pairs for English.
  */
 export const en: LocaleDefinition = {
-  code: "en",
+  code: "EN",
 
   // ── UI strings ─────────────────────────────────────────────────────────
   strings: {
@@ -66,14 +66,14 @@ export const en: LocaleDefinition = {
     showAllLanguagesDesc:
       "When off, only relations matching your language are shown. Turn on to see all.",
 
-    catFamily: "👨‍👩‍👧‍👦 Family",
-    catRomantic: "💕 Romantic",
-    catFriendship: "🤝 Friendship & social",
-    catProfessional: "💼 Professional",
-    catEducation: "🎓 Education",
-    catCreative: "🎨 Creative",
-    catMisc: "🔗 Miscellaneous",
-    catCustom: "📦 Custom",
+    catFamily: "Family 👨‍👩‍👧‍👦",
+    catRomantic: "Romantic 💕",
+    catFriendship: "Friendship & social 🤝",
+    catProfessional: "Professional 💼",
+    catEducation: "Education 🎓",
+    catCreative: "Creative 🎨",
+    catMisc: "Miscellaneous 🔗",
+    catCustom: "Custom 📦",
   },
 
   // ── Relation pairs by category ─────────────────────────────────────────
