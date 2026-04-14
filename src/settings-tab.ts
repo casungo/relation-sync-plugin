@@ -134,14 +134,13 @@ export class RelationSyncSettingTab extends PluginSettingTab {
           .setButtonText(strings.resetToDefaultsButton)
           .setWarning()
           .onClick(() => {
-            new ConfirmModal(this.app, strings.resetConfirm, () => {
+            new ConfirmModal(this.app, strings.resetConfirm, async () => {
               this.plugin.settings = JSON.parse(
                 JSON.stringify(DEFAULT_SETTINGS),
               );
-              this.plugin.saveSettings().then(() => {
-                new Notice(strings.resetNotice);
-                this.display();
-              });
+              await this.plugin.saveSettings();
+              new Notice(strings.resetNotice);
+              this.display();
             }).open();
           }),
       );
