@@ -134,13 +134,15 @@ export class RelationSyncSettingTab extends PluginSettingTab {
           .setButtonText(strings.resetToDefaultsButton)
           .setWarning()
           .onClick(() => {
-            new ConfirmModal(this.app, strings.resetConfirm, async () => {
-              this.plugin.settings = JSON.parse(
-                JSON.stringify(DEFAULT_SETTINGS),
-              );
-              await this.plugin.saveSettings();
-              new Notice(strings.resetNotice);
-              this.display();
+            new ConfirmModal(this.app, strings.resetConfirm, () => {
+              void (async () => {
+                this.plugin.settings = JSON.parse(
+                  JSON.stringify(DEFAULT_SETTINGS),
+                );
+                await this.plugin.saveSettings();
+                new Notice(strings.resetNotice);
+                this.display();
+              })();
             }).open();
           }),
       );
@@ -188,9 +190,9 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         text
           .setPlaceholder(strings.excludePathsPlaceholder)
           .setValue(this.plugin.settings.excludePaths ?? "")
-          .onChange(async (val) => {
+          .onChange((val) => {
             this.plugin.settings.excludePaths = val;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           }),
       );
 
@@ -226,15 +228,21 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       btn
         .setButtonText(strings.addPairButton)
         .setCta()
-        .onClick(async () => {
-          this.plugin.settings.relations.push({ forward: "", inverse: "", enabled: true });
-          await this.plugin.saveSettings();
-          this.searchQuery = "";
-          this.display();
-          // Scroll the list to bottom after DOM update
-          requestAnimationFrame(() => {
-            listEl.scrollTop = listEl.scrollHeight;
-          });
+        .onClick(() => {
+          void (async () => {
+            this.plugin.settings.relations.push({
+              forward: "",
+              inverse: "",
+              enabled: true,
+            });
+            await this.plugin.saveSettings();
+            this.searchQuery = "";
+            this.display();
+            // Scroll the list to bottom after DOM update
+            requestAnimationFrame(() => {
+              listEl.scrollTop = listEl.scrollHeight;
+            });
+          })();
         }),
     );
 
@@ -358,11 +366,13 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       btn
         .setIcon(isEnabled ? "check-circle" : "circle")
         .setTooltip(strings.togglePairTooltip)
-        .onClick(async () => {
-          pair.enabled = !isEnabled;
-          await this.plugin.saveSettings();
-          // Re-render only this row's container
-          this.display();
+        .onClick(() => {
+          void (async () => {
+            pair.enabled = !isEnabled;
+            await this.plugin.saveSettings();
+            // Re-render
+            this.display();
+          })();
         }),
     );
 
@@ -371,9 +381,9 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       text
         .setPlaceholder(strings.forwardPlaceholder)
         .setValue(pair.forward)
-        .onChange(async (val) => {
+        .onChange((val) => {
           pair.forward = val;
-          await this.plugin.saveSettings();
+          void this.plugin.saveSettings();
         }),
     );
 
@@ -388,9 +398,9 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       text
         .setPlaceholder(strings.inversePlaceholder)
         .setValue(pair.inverse)
-        .onChange(async (val) => {
+        .onChange((val) => {
           pair.inverse = val;
-          await this.plugin.saveSettings();
+          void this.plugin.saveSettings();
         }),
     );
 
@@ -399,10 +409,12 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       btn
         .setIcon("trash")
         .setTooltip(strings.removePairTooltip)
-        .onClick(async () => {
-          this.plugin.settings.relations.splice(index, 1);
-          await this.plugin.saveSettings();
-          this.display();
+        .onClick(() => {
+          void (async () => {
+            this.plugin.settings.relations.splice(index, 1);
+            await this.plugin.saveSettings();
+            this.display();
+          })();
         }),
     );
   }
@@ -445,43 +457,45 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json";
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const parsed = JSON.parse(text) as unknown;
-        if (!Array.isArray(parsed)) throw new Error("Not an array");
-        const pairs = parsed.filter(
-          (p): p is RelationPair =>
-            typeof p === "object" &&
-            p !== null &&
-            typeof (p as RelationPair).forward === "string" &&
-            typeof (p as RelationPair).inverse === "string",
-        );
+    input.onchange = () => {
+      void (async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text) as unknown;
+          if (!Array.isArray(parsed)) throw new Error("Not an array");
+          const pairs = parsed.filter(
+            (p): p is RelationPair =>
+              typeof p === "object" &&
+              p !== null &&
+              typeof (p as RelationPair).forward === "string" &&
+              typeof (p as RelationPair).inverse === "string",
+          );
 
-        // Merge: skip duplicates by forward+inverse key
-        const existing = new Set(
-          this.plugin.settings.relations.map(
-            (r) => `${r.forward.toLowerCase()}|${r.inverse.toLowerCase()}`,
-          ),
-        );
-        let added = 0;
-        for (const pair of pairs) {
-          const key = `${pair.forward.toLowerCase()}|${pair.inverse.toLowerCase()}`;
-          if (!existing.has(key)) {
-            this.plugin.settings.relations.push(pair);
-            existing.add(key);
-            added++;
+          // Merge: skip duplicates by forward+inverse key
+          const existing = new Set(
+            this.plugin.settings.relations.map(
+              (r) => `${r.forward.toLowerCase()}|${r.inverse.toLowerCase()}`,
+            ),
+          );
+          let added = 0;
+          for (const pair of pairs) {
+            const key = `${pair.forward.toLowerCase()}|${pair.inverse.toLowerCase()}`;
+            if (!existing.has(key)) {
+              this.plugin.settings.relations.push(pair);
+              existing.add(key);
+              added++;
+            }
           }
+          await this.plugin.saveSettings();
+          new Notice(strings.importSuccess(added));
+          this.display();
+        } catch (e) {
+          new Notice(strings.importError);
+          console.error("RelationSync import error:", e);
         }
-        await this.plugin.saveSettings();
-        new Notice(strings.importSuccess(added));
-        this.display();
-      } catch (e) {
-        new Notice(strings.importError);
-        console.error("RelationSync import error:", e);
-      }
+      })();
     };
     input.click();
   }
