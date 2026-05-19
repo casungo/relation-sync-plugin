@@ -53,7 +53,7 @@ class SyncLogModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Sync log" });
+    new Setting(contentEl).setName("Sync log").setHeading();
 
     if (this.entries.length === 0) {
       contentEl.createEl("p", { text: "No changes were made.", cls: "setting-item-description" });
@@ -136,9 +136,12 @@ export class RelationSyncSettingTab extends PluginSettingTab {
           .onClick(() => {
             new ConfirmModal(this.app, strings.resetConfirm, () => {
               void (async () => {
-                this.plugin.settings = JSON.parse(
-                  JSON.stringify(DEFAULT_SETTINGS),
-                );
+                this.plugin.settings = {
+                  ...DEFAULT_SETTINGS,
+                  relations: DEFAULT_SETTINGS.relations.map((relation) => ({
+                    ...relation,
+                  })),
+                };
                 await this.plugin.saveSettings();
                 new Notice(strings.resetNotice);
                 this.display();
@@ -239,7 +242,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
             this.searchQuery = "";
             this.display();
             // Scroll the list to bottom after DOM update
-            requestAnimationFrame(() => {
+            activeWindow.requestAnimationFrame(() => {
               listEl.scrollTop = listEl.scrollHeight;
             });
           })();
@@ -247,7 +250,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     );
 
     // ── Count label ────────────────────────────────────────────────────
-    const countEl = containerEl.createEl("div", {
+    const countEl = containerEl.createDiv({
       cls: "relation-sync-count",
       text: strings.pairsTotal(this.plugin.settings.relations.length),
     });
@@ -312,7 +315,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     });
 
     if (sortedCategories.length === 0) {
-      container.createEl("div", {
+      container.createDiv({
         text: query ? strings.noSearchResults : strings.noRelations,
         cls: "relation-sync-empty",
       });
@@ -444,9 +447,8 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         await this.app.vault.create(filename, json);
       }
       new Notice(`RelationSync: exported to ${filename}`);
-    } catch (e) {
+    } catch {
       new Notice(strings.importError);
-      console.error("RelationSync export error:", e);
     }
   }
 
@@ -491,9 +493,8 @@ export class RelationSyncSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
           new Notice(strings.importSuccess(added));
           this.display();
-        } catch (e) {
+        } catch {
           new Notice(strings.importError);
-          console.error("RelationSync import error:", e);
         }
       })();
     };

@@ -62,7 +62,7 @@ export default class RelationSyncPlugin extends Plugin {
       id: "open-settings",
       name: "Open settings",
       callback: () => {
-        // Navigate to the plugin's settings pane
+        // Navigate to this settings pane.
         const appWithSetting = this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } };
         appWithSetting.setting?.open();
         appWithSetting.setting?.openTabById(this.manifest.id);
@@ -70,17 +70,10 @@ export default class RelationSyncPlugin extends Plugin {
     });
 
     this.addSettingTab(new RelationSyncSettingTab(this.app, this));
-
-    if (process.env.NODE_ENV === "development") {
-      console.debug("RelationSync: loaded");
-    }
   }
 
   onunload(): void {
     this.engine.destroy();
-    if (process.env.NODE_ENV === "development") {
-      console.debug("RelationSync: unloaded");
-    }
   }
 
   async loadSettings(): Promise<void> {
@@ -103,10 +96,9 @@ export default class RelationSyncPlugin extends Plugin {
       const { count } = await this.engine.runBulkSync();
       notice.hide();
       new Notice(`Relation sync: sync completed on ${count} notes.`);
-    } catch (e) {
+    } catch {
       notice.hide();
       new Notice("Relation sync: bulk sync failed.");
-      console.error("RelationSync bulk sync error:", e);
     }
   }
 }

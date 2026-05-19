@@ -38,7 +38,7 @@ export class SyncEngine {
   private readonly writing = new Set<string>();
 
   /** Safety-net timers so a writing-guard can never leak forever. */
-  private readonly writingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly writingTimers = new Map<string, ReturnType<typeof activeWindow.setTimeout>>();
 
   /** Previous frontmatter snapshot per file path (for diffing). */
   private readonly prevFm = new Map<string, Record<string, unknown>>();
@@ -150,10 +150,8 @@ export class SyncEngine {
             }
           }
         });
-      } catch (err: unknown) {
+      } catch {
         this.clearWritingGuard(f.path);
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`RelationSync: failed to rewrite link in "${f.path}" after rename: ${msg}`);
       }
     }
   }
@@ -194,7 +192,7 @@ export class SyncEngine {
     this.debouncedFlush.cancel();
     this.pendingQueue.length = 0;
     this.prevFm.clear();
-    for (const t of this.writingTimers.values()) clearTimeout(t);
+    for (const t of this.writingTimers.values()) activeWindow.clearTimeout(t);
     this.writingTimers.clear();
     this.writing.clear();
     this.bulkSyncAbort = true;
@@ -215,9 +213,9 @@ export class SyncEngine {
   private setWritingGuardTimer(path: string): void {
     // Clear any existing timer first
     const existing = this.writingTimers.get(path);
-    if (existing) clearTimeout(existing);
+    if (existing) activeWindow.clearTimeout(existing);
 
-    const t = setTimeout(() => {
+    const t = activeWindow.setTimeout(() => {
       this.writing.delete(path);
       this.writingTimers.delete(path);
     }, WRITING_GUARD_TTL);
@@ -229,7 +227,7 @@ export class SyncEngine {
     this.writing.delete(path);
     const t = this.writingTimers.get(path);
     if (t) {
-      clearTimeout(t);
+      activeWindow.clearTimeout(t);
       this.writingTimers.delete(path);
     }
   }
@@ -404,9 +402,6 @@ export class SyncEngine {
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `RelationSync: failed to add inverse in "${target.path}": ${msg}`,
-      );
       new Notice(`RelationSync: error updating "${target.basename}" — ${msg}`);
     }
   }
@@ -468,9 +463,6 @@ export class SyncEngine {
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `RelationSync: failed to remove inverse in "${target.path}": ${msg}`,
-      );
       new Notice(`RelationSync: error updating "${target.basename}" — ${msg}`);
     }
   }

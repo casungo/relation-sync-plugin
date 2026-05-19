@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      attestations: write
+      id-token: write
     steps:
       - uses: actions/checkout@v3
 
@@ -23,6 +25,11 @@ jobs:
           npm install
           npm run build
 
+      - name: Attest main.js provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: main.js
+
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -32,11 +39,13 @@ jobs:
           if [ -f styles.css ]; then
             gh release create "$tag" \
               --title="$tag" \
+              --generate-notes \
               --draft \
               main.js manifest.json styles.css
           else
             gh release create "$tag" \
               --title="$tag" \
+              --generate-notes \
               --draft \
               main.js manifest.json
           fi
