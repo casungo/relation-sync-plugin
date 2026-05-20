@@ -61,13 +61,13 @@
 }
 
 /* ── Compact pair row ──────────────────────────────────────── */
-.relation-sync-row {
-  padding: 2px 4px !important;
-  border-bottom: none !important;
-  min-height: unset !important;
+.relation-sync-list .relation-sync-rows > .relation-sync-row.setting-item {
+  padding: 2px 4px;
+  border-bottom: none;
+  min-height: unset;
 }
-.relation-sync-row .setting-item-info {
-  display: none !important;
+.relation-sync-list .relation-sync-rows > .relation-sync-row.setting-item .setting-item-info {
+  display: none;
 }
 .relation-sync-row .setting-item-control {
   width: 100%;
