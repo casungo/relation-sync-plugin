@@ -1,7 +1,8 @@
 import { type App, Modal, Notice, PluginSettingTab, Setting, TFile } from "obsidian";
 import type RelationSyncPlugin from "./main";
 import { DEFAULT_SETTINGS, type RelationPair } from "./types";
-import type { SyncLogEntry } from "./sync-engine";
+import type { BulkSyncPlan, SyncLogEntry } from "./sync-engine";
+import { validateRelationPairs } from "./validation";
 import {
   type CategoryId,
   t,
@@ -52,20 +53,28 @@ class SyncLogModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this;
+    const strings = t();
     contentEl.empty();
-    new Setting(contentEl).setName("Sync log").setHeading();
+    new Setting(contentEl)
+      .setName(strings.syncLogTitle)
+      .setHeading()
+      .addButton((btn) =>
+        btn
+          .setButtonText(strings.copyLogButton)
+          .onClick(() => void this.copyLog()),
+      );
 
     if (this.entries.length === 0) {
-      contentEl.createEl("p", { text: "No changes were made.", cls: "setting-item-description" });
+      contentEl.createEl("p", { text: strings.noSyncChanges, cls: "setting-item-description" });
       return;
     }
 
     const table = contentEl.createEl("table", { cls: "relation-sync-log-table" });
     const head = table.createEl("thead").createEl("tr");
-    head.createEl("th", { text: "File" });
-    head.createEl("th", { text: "Action" });
-    head.createEl("th", { text: "Key" });
-    head.createEl("th", { text: "Link" });
+    head.createEl("th", { text: strings.logFileColumn });
+    head.createEl("th", { text: strings.logActionColumn });
+    head.createEl("th", { text: strings.logKeyColumn });
+    head.createEl("th", { text: strings.logLinkColumn });
 
     const tbody = table.createEl("tbody");
     for (const e of this.entries) {
@@ -80,6 +89,15 @@ class SyncLogModal extends Modal {
   onClose(): void {
     this.contentEl.empty();
   }
+
+  private async copyLog(): Promise<void> {
+    const strings = t();
+    const text = this.entries
+      .map((entry) => `${entry.action}\t${entry.file}\t${entry.key}\t${entry.link}`)
+      .join("\n");
+    await navigator.clipboard.writeText(text || strings.noSyncChanges);
+    new Notice(strings.copyLogNotice);
+  }
 }
 
 class ConfirmModal extends Modal {
@@ -87,15 +105,80 @@ class ConfirmModal extends Modal {
     super(app);
   }
   onOpen() {
+    const strings = t();
     this.contentEl.createEl("p", { text: this.message });
     new Setting(this.contentEl)
-      .addButton(btn => btn.setButtonText("Cancel").onClick(() => this.close()))
-      .addButton(btn => btn.setButtonText("Confirm").setWarning().onClick(() => {
+      .addButton(btn => btn.setButtonText(strings.cancelButton).onClick(() => this.close()))
+      .addButton(btn => btn.setButtonText(strings.confirmButton).setWarning().onClick(() => {
         this.onConfirm();
         this.close();
       }));
   }
   onClose() {
+    this.contentEl.empty();
+  }
+}
+
+class BulkSyncPreviewModal extends Modal {
+  constructor(
+    app: App,
+    private readonly plan: BulkSyncPlan,
+    private readonly onConfirm: () => void,
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const strings = t();
+    const { contentEl } = this;
+    contentEl.empty();
+
+    new Setting(contentEl).setName(strings.bulkPreviewTitle).setHeading();
+    contentEl.createEl("p", {
+      text: strings.bulkPreviewDesc(this.plan.entries.length, this.plan.filesScanned),
+      cls: "setting-item-description",
+    });
+
+    if (this.plan.entries.length > 0) {
+      const table = contentEl.createEl("table", { cls: "relation-sync-log-table relation-sync-preview-table" });
+      const head = table.createEl("thead").createEl("tr");
+      head.createEl("th", { text: strings.logFileColumn });
+      head.createEl("th", { text: strings.logActionColumn });
+      head.createEl("th", { text: strings.logKeyColumn });
+      head.createEl("th", { text: strings.logLinkColumn });
+
+      const tbody = table.createEl("tbody");
+      for (const entry of this.plan.entries.slice(0, 200)) {
+        const tr = tbody.createEl("tr");
+        tr.createEl("td", { text: entry.file });
+        tr.createEl("td", { text: entry.action, cls: `sync-log-${entry.action}` });
+        tr.createEl("td", { text: entry.key });
+        tr.createEl("td", { text: entry.link });
+      }
+      if (this.plan.entries.length > 200) {
+        contentEl.createEl("p", {
+          text: strings.bulkPreviewTruncated(this.plan.entries.length - 200),
+          cls: "setting-item-description",
+        });
+      }
+    } else {
+      contentEl.createEl("p", { text: strings.noSyncChanges, cls: "setting-item-description" });
+    }
+
+    new Setting(contentEl)
+      .addButton((btn) => btn.setButtonText(strings.cancelButton).onClick(() => this.close()))
+      .addButton((btn) =>
+        btn
+          .setButtonText(strings.confirmBulkSyncButton)
+          .setWarning()
+          .onClick(() => {
+            this.onConfirm();
+            this.close();
+          }),
+      );
+  }
+
+  onClose(): void {
     this.contentEl.empty();
   }
 }
@@ -272,6 +355,18 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     const strings = t();
     const query = this.searchQuery.toLowerCase().trim();
     const relations = this.plugin.settings.relations;
+    const validationIssues = validateRelationPairs(relations, {
+      emptyField: strings.validationEmptyField,
+      sameField: strings.validationSameField,
+      duplicatePair: strings.validationDuplicatePair,
+      conflictingKey: strings.validationConflictingKey,
+    });
+    const issuesByIndex = new Map<number, string[]>();
+    for (const issue of validationIssues) {
+      const messages = issuesByIndex.get(issue.index) ?? [];
+      messages.push(issue.message);
+      issuesByIndex.set(issue.index, messages);
+    }
 
     // Group by category ID
     const grouped = new Map<
@@ -346,7 +441,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
 
       const rowsEl = details.createDiv({ cls: "relation-sync-rows" });
       for (const { pair, index } of items) {
-        this.renderPairRow(rowsEl, pair, index);
+        this.renderPairRow(rowsEl, pair, index, issuesByIndex.get(index) ?? []);
       }
     }
   }
@@ -357,12 +452,14 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     containerEl: HTMLElement,
     pair: RelationPair,
     index: number,
+    issues: string[],
   ): void {
     const strings = t();
     const isEnabled = pair.enabled !== false;
     const setting = new Setting(containerEl);
     setting.settingEl.addClass("relation-sync-row");
     if (!isEnabled) setting.settingEl.addClass("relation-sync-row--disabled");
+    if (issues.length > 0) setting.settingEl.addClass("relation-sync-row--invalid");
 
     // Enable / Disable toggle button
     setting.addExtraButton((btn) =>
@@ -407,6 +504,11 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         }),
     );
 
+    if (issues.length > 0) {
+      setting.descEl.setText(issues.join(" "));
+      setting.descEl.addClass("relation-sync-validation");
+    }
+
     // Delete button
     setting.addExtraButton((btn) =>
       btn
@@ -426,11 +528,14 @@ export class RelationSyncSettingTab extends PluginSettingTab {
 
   private async runBulkSync(): Promise<void> {
     const strings = t();
-    const { count, log } = await this.plugin.engine.runBulkSync();
-    new Notice(strings.syncNotice(count));
-    if (log.length > 0) {
-      new SyncLogModal(this.app, log).open();
-    }
+    const plan = this.plugin.engine.previewBulkSync();
+    new BulkSyncPreviewModal(this.app, plan, () => {
+      void (async () => {
+        const { count, log } = await this.plugin.engine.runBulkSync();
+        new Notice(strings.syncNotice(count));
+        new SyncLogModal(this.app, log).open();
+      })();
+    }).open();
   }
 
   // ── Export pairs ──────────────────────────────────────────────────────
@@ -442,13 +547,18 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     try {
       const existing = this.app.vault.getAbstractFileByPath(filename);
       if (existing instanceof TFile) {
-        await this.app.vault.modify(existing, json);
+        new ConfirmModal(this.app, strings.exportOverwriteConfirm(filename), () => {
+          void (async () => {
+            await this.app.vault.modify(existing, json);
+            new Notice(strings.exportSuccess(filename));
+          })();
+        }).open();
       } else {
         await this.app.vault.create(filename, json);
+        new Notice(strings.exportSuccess(filename));
       }
-      new Notice(`RelationSync: exported to ${filename}`);
     } catch {
-      new Notice(strings.importError);
+      new Notice(strings.exportError);
     }
   }
 

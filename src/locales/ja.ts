@@ -26,11 +26,43 @@ export const ja: LocaleDefinition = {
       "保管庫内のすべてのファイルで逆関係を再計算して追加します。",
     syncVaultButton: "一括同期を実行",
     syncNotice: (count) => `RelationSync: ${count} 件のノートで同期が完了しました。`,
+    bulkSyncRunningNotice: "RelationSync: 一括同期を実行中...",
+    bulkSyncFailedNotice: "RelationSync: 一括同期に失敗しました。",
+
+    bulkPreviewTitle: "一括同期のプレビュー",
+    bulkPreviewDesc: (changes, files) =>
+      `保管庫に書き込む前に、${files} 件のノートに対する ${changes} 件の予定変更を確認してください。`,
+    bulkPreviewTruncated: (count) => `さらに ${count} 件の変更は表示されていません。`,
+    confirmBulkSyncButton: "変更を適用",
+    syncLogTitle: "同期ログ",
+    noSyncChanges: "変更はありませんでした。",
+    copyLogButton: "ログをコピー",
+    copyLogNotice: "RelationSync: ログをコピーしました。",
+    logFileColumn: "ファイル",
+    logActionColumn: "操作",
+    logKeyColumn: "キー",
+    logLinkColumn: "Link",
+    cancelButton: "キャンセル",
+    confirmButton: "確認",
+    openRelationsPanel: "関係パネルを開く",
+
+    relationsPanelTitle: "関係",
+    relationsPanelNoFile: "関係を表示するにはノートを開いてください。",
+    relationsPanelNoFrontmatter: "このノートには frontmatter がありません。",
+    relationsPanelNoRelations: "このノートに設定済みの関係は見つかりません。",
+    relationsPanelRelationCount: (count) =>
+      `${count} 件の関連ノート`,
+    relationsPanelOpenNoteTooltip: "ノートを開く",
 
     exportPairs: "関係ペアをエクスポート",
     exportPairsDesc:
       "現在の関係ペアをバウルトのルートにJSONファイルとして保存します。",
     exportPairsButton: "JSONにエクスポート",
+
+    exportSuccess: (filename) => `RelationSync: ${filename} にエクスポートしました。`,
+    exportError: "RelationSync: エクスポートに失敗しました。",
+    exportOverwriteConfirm: (filename) =>
+      `${filename} は保管庫のルートにすでに存在します。\n\n上書きしますか？`,
     importPairs: "関係ペアをインポート",
     importPairsDesc:
       "JSONファイルから関係ペアを読み込みます（既存のペアとマージ）。",
@@ -55,6 +87,12 @@ export const ja: LocaleDefinition = {
     inversePlaceholder: "逆方向 (例: の友達)",
     removePairTooltip: "このペアを削除",
     togglePairTooltip: "このペアを有効 / 無効化",
+
+    validationEmptyField: "両方の関係フィールドが必要です。",
+    validationSameField: "順方向と逆方向を同じにすることはできません。",
+    validationDuplicatePair: "この関係ペアは重複しています。",
+    validationConflictingKey: (key) =>
+      `「${key}」は別の有効なペアですでに管理されています。`,
 
     noSearchResults: "検索条件に一致する関係が見つかりません。",
     noRelations: '関係が定義されていません。「+ ペアを追加」をクリックして作成してください。',

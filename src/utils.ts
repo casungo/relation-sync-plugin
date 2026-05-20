@@ -23,6 +23,52 @@ export function linksEqual(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
+/** Return the note target portion from a wiki link or plain link text. */
+export function normalizeLinkTarget(link: string): string {
+  let target = link.trim();
+  const wikiMatch = target.match(/^\[\[([^\]]+)]]$/);
+  if (wikiMatch?.[1]) target = wikiMatch[1];
+  const pipe = target.indexOf("|");
+  if (pipe !== -1) target = target.slice(0, pipe);
+  const hash = target.indexOf("#");
+  if (hash !== -1) target = target.slice(0, hash);
+  return target.replace(/\.md$/i, "").trim();
+}
+
+/** Compare link targets after removing wiki syntax, aliases, headings, and .md. */
+export function linkTargetsEqual(a: string, b: string): boolean {
+  return linksEqual(normalizeLinkTarget(a), normalizeLinkTarget(b));
+}
+
+/** Wrap Obsidian link text in wiki-link syntax. */
+export function toWikiLink(linkText: string): string {
+  return `[[${normalizeLinkTarget(linkText)}]]`;
+}
+
+/** Replace the target portion of matching wiki links while preserving alias/heading text. */
+export function replaceWikiLinkTarget(
+  value: string,
+  oldPath: string,
+  newPath: string,
+): string {
+  const oldTarget = normalizeLinkTarget(oldPath);
+  const oldBase = oldTarget.split("/").pop() ?? oldTarget;
+  const newTarget = normalizeLinkTarget(newPath);
+  const newBase = newTarget.split("/").pop() ?? newTarget;
+
+  return value.replace(/\[\[([^\]|#]+)((?:#[^\]|]+)?(?:\|[^\]]+)?)]]/g, (match, rawTarget: string, suffix: string) => {
+    const target = normalizeLinkTarget(rawTarget);
+    const targetBase = target.split("/").pop() ?? target;
+    if (linksEqual(target, oldTarget)) {
+      return `[[${newTarget}${suffix}]]`;
+    }
+    if (!target.includes("/") && linksEqual(targetBase, oldBase)) {
+      return `[[${newBase}${suffix}]]`;
+    }
+    return match;
+  });
+}
+
 /**
  * Adapt the casing of `target` to match `source`.
  */

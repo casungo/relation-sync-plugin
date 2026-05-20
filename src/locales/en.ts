@@ -29,11 +29,41 @@ export const en: LocaleDefinition = {
       "Re-compute and add all inverse relations across every file in the vault.",
     syncVaultButton: "Run global sync",
     syncNotice: (count) => `RelationSync: sync completed on ${count} notes.`,
+    bulkSyncRunningNotice: "RelationSync: bulk sync running...",
+    bulkSyncFailedNotice: "RelationSync: bulk sync failed.",
+    bulkPreviewTitle: "Bulk sync preview",
+    bulkPreviewDesc: (changes, files) =>
+      `Review ${changes} planned changes across ${files} notes before writing to the vault.`,
+    bulkPreviewTruncated: (count) => `${count} more changes are not shown.`,
+    confirmBulkSyncButton: "Apply changes",
+    syncLogTitle: "Sync log",
+    noSyncChanges: "No changes were made.",
+    copyLogButton: "Copy log",
+    copyLogNotice: "RelationSync: log copied.",
+    logFileColumn: "File",
+    logActionColumn: "Action",
+    logKeyColumn: "Key",
+    logLinkColumn: "Link",
+    cancelButton: "Cancel",
+    confirmButton: "Confirm",
+    openRelationsPanel: "Open relations panel",
+
+    relationsPanelTitle: "Relations",
+    relationsPanelNoFile: "Open a note to see its relations.",
+    relationsPanelNoFrontmatter: "This note has no frontmatter.",
+    relationsPanelNoRelations: "No configured relations found in this note.",
+    relationsPanelRelationCount: (count) =>
+      count === 1 ? "1 related note" : `${count} related notes`,
+    relationsPanelOpenNoteTooltip: "Open note",
 
     exportPairs: "Export relation pairs",
     exportPairsDesc:
       "Save all current relation pairs to a JSON file in your vault root.",
     exportPairsButton: "Export to JSON",
+    exportSuccess: (filename) => `RelationSync: exported to ${filename}.`,
+    exportError: "RelationSync: export failed.",
+    exportOverwriteConfirm: (filename) =>
+      `${filename} already exists in the vault root.\n\nOverwrite it?`,
     importPairs: "Import relation pairs",
     importPairsDesc:
       "Load relation pairs from a JSON file (merges with existing pairs).",
@@ -58,6 +88,11 @@ export const en: LocaleDefinition = {
     inversePlaceholder: "Inverse (e.g., friend of)",
     removePairTooltip: "Remove this pair",
     togglePairTooltip: "Enable/disable this pair",
+    validationEmptyField: "Both relation fields are required.",
+    validationSameField: "Forward and inverse cannot be the same.",
+    validationDuplicatePair: "This relation pair is duplicated.",
+    validationConflictingKey: (key) =>
+      `"${key}" is already managed by another enabled pair.`,
 
     noSearchResults: "No relations match your search.",
     noRelations: 'No relations defined. Click "add pair" to create one.',

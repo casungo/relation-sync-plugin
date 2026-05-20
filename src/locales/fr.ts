@@ -26,11 +26,43 @@ export const fr: LocaleDefinition = {
       "Re-calcule et ajoute toutes les relations inverses dans chaque fichier du coffre.",
     syncVaultButton: "Lancer la synchronisation globale",
     syncNotice: (count) => `RelationSync : synchronisation terminée sur ${count} notes.`,
+    bulkSyncRunningNotice: "RelationSync : synchronisation massive en cours...",
+    bulkSyncFailedNotice: "RelationSync : échec de la synchronisation massive.",
+
+    bulkPreviewTitle: "Aperçu de la synchronisation massive",
+    bulkPreviewDesc: (changes, files) =>
+      `Vérifiez ${changes} changements prévus dans ${files} notes avant d'écrire dans le coffre.`,
+    bulkPreviewTruncated: (count) => `${count} changements supplémentaires ne sont pas affichés.`,
+    confirmBulkSyncButton: "Appliquer les changements",
+    syncLogTitle: "Journal de synchronisation",
+    noSyncChanges: "Aucun changement effectué.",
+    copyLogButton: "Copier le journal",
+    copyLogNotice: "RelationSync : journal copié.",
+    logFileColumn: "Fichier",
+    logActionColumn: "Action",
+    logKeyColumn: "Clé",
+    logLinkColumn: "Lien",
+    cancelButton: "Annuler",
+    confirmButton: "Confirmer",
+    openRelationsPanel: "Ouvrir le panneau des relations",
+
+    relationsPanelTitle: "Relations",
+    relationsPanelNoFile: "Ouvrez une note pour voir ses relations.",
+    relationsPanelNoFrontmatter: "Cette note n'a pas de frontmatter.",
+    relationsPanelNoRelations: "Aucune relation configurée trouvée dans cette note.",
+    relationsPanelRelationCount: (count) =>
+      count === 1 ? "1 note liée" : `${count} notes liées`,
+    relationsPanelOpenNoteTooltip: "Ouvrir la note",
 
     exportPairs: "Exporter les paires de relations",
     exportPairsDesc:
       "Enregistre toutes les paires de relations actuelles dans un fichier JSON à la racine du coffre.",
     exportPairsButton: "Exporter en JSON",
+
+    exportSuccess: (filename) => `RelationSync : exporté vers ${filename}.`,
+    exportError: "RelationSync : échec de l'exportation.",
+    exportOverwriteConfirm: (filename) =>
+      `${filename} existe déjà à la racine du coffre.\n\nL'écraser ?`,
     importPairs: "Importer des paires de relations",
     importPairsDesc:
       "Charge des paires de relations depuis un fichier JSON (fusionne avec les paires existantes).",
@@ -55,6 +87,12 @@ export const fr: LocaleDefinition = {
     inversePlaceholder: "inverse (ex: ami de)",
     removePairTooltip: "Supprimer cette paire",
     togglePairTooltip: "Activer / désactiver cette paire",
+
+    validationEmptyField: "Les deux champs de relation sont obligatoires.",
+    validationSameField: "La relation directe et l'inverse ne peuvent pas être identiques.",
+    validationDuplicatePair: "Cette paire de relations est dupliquée.",
+    validationConflictingKey: (key) =>
+      `"${key}" est déjà gérée par une autre paire activée.`,
 
     noSearchResults: "Aucune relation ne correspond à votre recherche.",
     noRelations: 'Aucune relation définie. Cliquez sur "+ Ajouter une paire" pour en créer une.',

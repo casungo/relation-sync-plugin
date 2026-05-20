@@ -23,11 +23,43 @@ export const zh: LocaleDefinition = {
     syncVaultDesc: "重新计算并添加仓库中每个文件的所有逆关系。",
     syncVaultButton: "运行全局同步",
     syncNotice: (count) => `RelationSync: ${count} 个笔记同步完成。`,
+    bulkSyncRunningNotice: "RelationSync: 正在运行批量同步...",
+    bulkSyncFailedNotice: "RelationSync: 批量同步失败。",
+
+    bulkPreviewTitle: "批量同步预览",
+    bulkPreviewDesc: (changes, files) =>
+      `写入仓库前，请检查 ${files} 篇笔记中的 ${changes} 项计划更改。`,
+    bulkPreviewTruncated: (count) => `还有 ${count} 项更改未显示。`,
+    confirmBulkSyncButton: "应用更改",
+    syncLogTitle: "同步日志",
+    noSyncChanges: "未进行任何更改。",
+    copyLogButton: "复制日志",
+    copyLogNotice: "RelationSync: 日志已复制。",
+    logFileColumn: "文件",
+    logActionColumn: "操作",
+    logKeyColumn: "键",
+    logLinkColumn: "Link",
+    cancelButton: "取消",
+    confirmButton: "确认",
+    openRelationsPanel: "打开关系面板",
+
+    relationsPanelTitle: "关系",
+    relationsPanelNoFile: "打开一篇笔记以查看其关系。",
+    relationsPanelNoFrontmatter: "这篇笔记没有 frontmatter。",
+    relationsPanelNoRelations: "这篇笔记中没有找到已配置的关系。",
+    relationsPanelRelationCount: (count) =>
+      `${count} 篇相关笔记`,
+    relationsPanelOpenNoteTooltip: "打开笔记",
 
     exportPairs: "导出关系对",
     exportPairsDesc:
       "将所有当前关系对保存为仓库根目录下的 JSON 文件。",
     exportPairsButton: "导出为 JSON",
+
+    exportSuccess: (filename) => `RelationSync: 已导出到 ${filename}。`,
+    exportError: "RelationSync: 导出失败。",
+    exportOverwriteConfirm: (filename) =>
+      `${filename} 已存在于仓库根目录。\n\n是否覆盖？`,
     importPairs: "导入关系对",
     importPairsDesc:
       "从 JSON 文件导入关系对（与现有对合并）。",
@@ -52,6 +84,12 @@ export const zh: LocaleDefinition = {
     inversePlaceholder: "反向（例如：的朋友）",
     removePairTooltip: "删除此关系对",
     togglePairTooltip: "启用 / 禁用此关系对",
+
+    validationEmptyField: "两个关系字段都是必填项。",
+    validationSameField: "正向关系和反向关系不能相同。",
+    validationDuplicatePair: "此关系对重复。",
+    validationConflictingKey: (key) =>
+      `"${key}" 已由另一个启用的关系对管理。`,
 
     noSearchResults: "未找到匹配你的搜索的关系。",
     noRelations: "未定义关系。点击「+ 添加关系对」来创建一个。",

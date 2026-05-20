@@ -1,7 +1,14 @@
 import { type App, type CachedMetadata, Notice, TFile } from "obsidian";
 import type { RelationSyncSettings } from "./types";
 import { buildRelationMap } from "./relation-map";
-import { debounce, linksEqual, parseWikiLinks, matchCasing } from "./utils";
+import {
+  debounce,
+  linkTargetsEqual,
+  parseWikiLinks,
+  matchCasing,
+  replaceWikiLinkTarget,
+  toWikiLink,
+} from "./utils";
 
 /** Typed representation of Obsidian's frontmatter link entry (available 1.4+). */
 interface FrontmatterLinkEntry {
@@ -17,6 +24,15 @@ export interface SyncLogEntry {
   action: "added" | "removed";
   key: string;
   link: string;
+}
+
+export interface BulkSyncPlan {
+  filesScanned: number;
+  entries: SyncLogEntry[];
+}
+
+interface PlannedSyncChange extends SyncLogEntry {
+  sourcePath: string;
 }
 
 /** How long to wait (ms) after a metadata change before flushing writes. */
@@ -113,12 +129,9 @@ export class SyncEngine {
     this.prevFm.delete(oldPath);
     if (snap) this.prevFm.set(file.path, snap);
 
-    const oldBasename = oldPath.split("/").pop()?.replace(/\.md$/, "") ?? "";
-    const newBasename = file.basename;
-    if (oldBasename === newBasename) return; // only the folder changed — links still valid
-
-    const oldLink = `[[${oldBasename}]]`;
-    const newLink = `[[${newBasename}]]`;
+    const oldLinkPath = oldPath.replace(/\.md$/i, "");
+    const newLinkPath = file.path.replace(/\.md$/i, "");
+    const oldBasename = oldLinkPath.split("/").pop() ?? oldLinkPath;
 
     for (const f of this.app.vault.getMarkdownFiles()) {
       if (f.path === file.path) continue;
@@ -129,8 +142,8 @@ export class SyncEngine {
       // Check if any frontmatter value references the old link
       const fm = cache.frontmatter;
       const hasRef = Object.values(fm).some((v) => {
-        if (typeof v === "string") return v.includes(oldBasename);
-        if (Array.isArray(v)) return v.some((item) => typeof item === "string" && item.includes(oldBasename));
+        if (typeof v === "string") return v.includes("[[") && v.includes(oldBasename);
+        if (Array.isArray(v)) return v.some((item) => typeof item === "string" && item.includes("[[") && item.includes(oldBasename));
         return false;
       });
       if (!hasRef) continue;
@@ -142,18 +155,34 @@ export class SyncEngine {
           for (const key of Object.keys(fmObj)) {
             const val = fmObj[key];
             if (typeof val === "string") {
-              fmObj[key] = val.replace(oldLink, newLink);
+              fmObj[key] = replaceWikiLinkTarget(val, oldLinkPath, newLinkPath);
             } else if (Array.isArray(val)) {
               fmObj[key] = val.map((item) =>
-                typeof item === "string" ? item.replace(oldLink, newLink) : item
+                typeof item === "string" ? replaceWikiLinkTarget(item, oldLinkPath, newLinkPath) : item
               );
             }
           }
         });
-      } catch {
+      } catch (err: unknown) {
         this.clearWritingGuard(f.path);
+        const msg = err instanceof Error ? err.message : String(err);
+        new Notice(`RelationSync: error updating links in "${f.basename}" — ${msg}`);
       }
     }
+  }
+
+  /** Compute the changes a full vault sync would apply. */
+  previewBulkSync(): BulkSyncPlan {
+    const planned = this.createBulkSyncPlan();
+    return {
+      filesScanned: planned.filesScanned,
+      entries: planned.entries.map((entry) => ({
+        file: entry.file,
+        action: entry.action,
+        key: entry.key,
+        link: entry.link,
+      })),
+    };
   }
 
   /** Run a full vault sync — re-computes all inverse relations from scratch. */
@@ -161,18 +190,24 @@ export class SyncEngine {
     this.bulkSyncAbort = false;
     this.syncLog = [];
 
-    const files = this.app.vault.getMarkdownFiles();
-    let count = 0;
-    for (const file of files) {
-      if (this.bulkSyncAbort) break;
-      if (this.isExcluded(file.path)) continue;
-      const cache = this.app.metadataCache.getFileCache(file);
-      if (!cache?.frontmatter) continue;
-      this.prevFm.set(file.path, {}); // pretend everything is new
-      await this.processMetaChanged(file, cache);
-      count++;
+    const plan = this.createBulkSyncPlan();
+    const changesByFile = new Map<string, PlannedSyncChange[]>();
+    for (const entry of plan.entries) {
+      const source = this.app.vault.getAbstractFileByPath(entry.sourcePath);
+      if (!(source instanceof TFile)) continue;
+      const changes = changesByFile.get(entry.file) ?? [];
+      changes.push(entry);
+      changesByFile.set(entry.file, changes);
     }
-    return { count, log: [...this.syncLog] };
+
+    for (const [path, changes] of changesByFile) {
+      if (this.bulkSyncAbort) break;
+      const target = this.app.vault.getAbstractFileByPath(path);
+      if (!(target instanceof TFile)) continue;
+      await this.applyBulkChanges(target, changes);
+    }
+    this.snapshotVault();
+    return { count: plan.filesScanned, log: [...this.syncLog] };
   }
 
   /** Cancel an in-progress bulk sync. */
@@ -284,7 +319,8 @@ export class SyncEngine {
                           Object.keys(prev).find((k) => k.toLowerCase() === key) ?? key;
       const dynamicInverseKey = matchCasing(originalKey, inverseKey);
 
-      const currentLinks = this.getLinksViaCache(cache, key);
+      const cachedLinks = this.getLinksViaCache(cache, key);
+      const currentLinks = cachedLinks.length > 0 ? cachedLinks : this.getLinksFromRaw(fm, key);
       const prevLinks = this.getLinksFromRaw(prev, key);
 
       const added = currentLinks.filter(
@@ -347,7 +383,107 @@ export class SyncEngine {
     const fileA = this.app.metadataCache.getFirstLinkpathDest(a, sourcePath);
     const fileB = this.app.metadataCache.getFirstLinkpathDest(b, sourcePath);
     if (fileA && fileB) return fileA.path === fileB.path;
-    return linksEqual(a, b);
+    return linkTargetsEqual(a, b);
+  }
+
+  private createBulkSyncPlan(): { filesScanned: number; entries: PlannedSyncChange[] } {
+    const files = this.app.vault.getMarkdownFiles().filter((file) => !this.isExcluded(file.path));
+    const entries: PlannedSyncChange[] = [];
+    const desired = new Map<string, Map<string, Map<string, PlannedSyncChange>>>();
+    let filesScanned = 0;
+
+    const addDesired = (target: TFile, key: string, link: string, sourcePath: string): void => {
+      const targetMap = desired.get(target.path) ?? new Map<string, Map<string, PlannedSyncChange>>();
+      desired.set(target.path, targetMap);
+      const keyMap = targetMap.get(key.toLowerCase()) ?? new Map<string, PlannedSyncChange>();
+      targetMap.set(key.toLowerCase(), keyMap);
+      keyMap.set(sourcePath, { file: target.path, action: "added", key, link, sourcePath });
+    };
+
+    for (const sourceFile of files) {
+      const cache = this.app.metadataCache.getFileCache(sourceFile);
+      if (!cache?.frontmatter) continue;
+      filesScanned++;
+      const fm = cache.frontmatter;
+
+      for (const rawKey of Object.keys(fm)) {
+        const key = rawKey.toLowerCase();
+        const inverseKey = this.relationMap.get(key);
+        if (!inverseKey) continue;
+        const dynamicInverseKey = matchCasing(rawKey, inverseKey);
+        const currentLinks = this.getLinksViaCache(cache, key);
+        const links = currentLinks.length > 0 ? currentLinks : this.getLinksFromRaw(fm, key);
+        for (const targetName of links) {
+          const target = this.app.metadataCache.getFirstLinkpathDest(targetName, sourceFile.path);
+          if (!(target instanceof TFile)) continue;
+          if (this.isExcluded(target.path)) continue;
+          addDesired(target, dynamicInverseKey, this.makeLinkToFile(sourceFile, target.path), sourceFile.path);
+        }
+      }
+    }
+
+    for (const targetFile of files) {
+      const cache = this.app.metadataCache.getFileCache(targetFile);
+      const fm = cache?.frontmatter;
+      if (!fm) continue;
+      for (const rawKey of Object.keys(fm)) {
+        const key = rawKey.toLowerCase();
+        if (!this.relationMap.has(key)) continue;
+        const existingLinks = this.getLinksViaCache(cache, key);
+        const links = existingLinks.length > 0 ? existingLinks : this.getLinksFromRaw(fm, key);
+        const existingValues = this.getExistingStringValues(fm[rawKey]);
+        for (const linkTarget of links) {
+          const source = this.app.metadataCache.getFirstLinkpathDest(linkTarget, targetFile.path);
+          if (!(source instanceof TFile)) continue;
+          if (this.isExcluded(source.path)) continue;
+          const desiredForSource = desired.get(targetFile.path)?.get(key)?.get(source.path);
+          if (desiredForSource) continue;
+          const link = existingValues.find((value) => linkTargetsEqual(value, linkTarget)) ?? toWikiLink(linkTarget);
+          entries.push({ file: targetFile.path, action: "removed", key: rawKey, link, sourcePath: source.path });
+        }
+      }
+    }
+
+    for (const targetChanges of desired.values()) {
+      for (const keyChanges of targetChanges.values()) {
+        for (const change of keyChanges.values()) {
+          const target = this.app.vault.getAbstractFileByPath(change.file);
+          if (!(target instanceof TFile)) continue;
+          const cache = this.app.metadataCache.getFileCache(target);
+          const fm = cache?.frontmatter ?? {};
+          const actualKey = this.findActualKey(fm, change.key);
+          const existingLinks = actualKey ? parseWikiLinks(fm[actualKey]) : [];
+          const alreadyPresent = existingLinks.some((value) =>
+            this.resolvedLinksEqual(value, change.link, target.path),
+          );
+          if (!alreadyPresent) entries.push(change);
+        }
+      }
+    }
+
+    entries.sort((a, b) =>
+      a.file.localeCompare(b.file) ||
+      a.key.localeCompare(b.key) ||
+      a.action.localeCompare(b.action) ||
+      a.link.localeCompare(b.link),
+    );
+    return { filesScanned, entries };
+  }
+
+  private getExistingStringValues(value: unknown): string[] {
+    if (typeof value === "string") return [value];
+    if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+    return [];
+  }
+
+  private findActualKey(fm: Record<string, unknown>, key: string): string | undefined {
+    const lowerKey = key.toLowerCase();
+    return Object.keys(fm).find((candidate) => candidate.toLowerCase() === lowerKey);
+  }
+
+  private makeLinkToFile(file: TFile, sourcePath: string): string {
+    const linkText = this.app.metadataCache.fileToLinktext?.(file, sourcePath, true) ?? file.basename;
+    return toWikiLink(linkText);
   }
 
   private async addInverse(
@@ -362,43 +498,27 @@ export class SyncEngine {
     if (!(target instanceof TFile)) return;
     if (this.isExcluded(target.path)) return;
 
-    const sourceLink = `[[${sourceFile.basename}]]`;
+    const sourceLink = this.makeLinkToFile(sourceFile, target.path);
+    await this.applyAddInverse(target, inverseKey, sourceLink);
+  }
+
+  private async applyAddInverse(
+    target: TFile,
+    inverseKey: string,
+    sourceLink: string,
+  ): Promise<void> {
     this.writing.add(target.path);
     this.setWritingGuardTimer(target.path);
 
     try {
+      let changed = false;
       await this.app.fileManager.processFrontMatter(
         target,
         (fm: Record<string, unknown>) => {
-          // Find case-insensitive match for the key if it already exists
-          let actualKey = inverseKey;
-          const lowerInverse = inverseKey.toLowerCase();
-          for (const k of Object.keys(fm)) {
-            if (k.toLowerCase() === lowerInverse) {
-              actualKey = k;
-              break;
-            }
-          }
-
-          const existing = fm[actualKey];
-
-          if (existing === undefined || existing === null) {
-            fm[actualKey] = sourceLink;
-          } else if (Array.isArray(existing)) {
-            const alreadyPresent = existing.some(
-              (v: unknown) =>
-                typeof v === "string" && linksEqual(v, sourceLink),
-            );
-            if (!alreadyPresent) existing.push(sourceLink);
-          } else if (
-            typeof existing === "string" &&
-            !linksEqual(existing, sourceLink)
-          ) {
-            fm[actualKey] = [existing, sourceLink];
-          }
+          changed = this.addInverseToFrontmatter(fm, inverseKey, sourceLink);
         },
       );
-      this.syncLog.push({ file: target.path, action: "added", key: inverseKey, link: sourceLink });
+      if (changed) this.syncLog.push({ file: target.path, action: "added", key: inverseKey, link: sourceLink });
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
@@ -418,52 +538,127 @@ export class SyncEngine {
     if (!(target instanceof TFile)) return;
     if (this.isExcluded(target.path)) return;
 
-    const sourceLink = `[[${sourceFile.basename}]]`;
+    const sourceLink = this.makeLinkToFile(sourceFile, target.path);
+    await this.applyRemoveInverse(target, inverseKey, sourceLink);
+  }
+
+  private async applyRemoveInverse(
+    target: TFile,
+    inverseKey: string,
+    sourceLink: string,
+  ): Promise<void> {
     this.writing.add(target.path);
     this.setWritingGuardTimer(target.path);
 
     try {
+      let changed = false;
       await this.app.fileManager.processFrontMatter(
         target,
         (fm: Record<string, unknown>) => {
-          // Find case-insensitive match for the key if it already exists
-          let actualKey = inverseKey;
-          const lowerInverse = inverseKey.toLowerCase();
-          for (const k of Object.keys(fm)) {
-            if (k.toLowerCase() === lowerInverse) {
-              actualKey = k;
-              break;
-            }
-          }
-
-          const existing = fm[actualKey];
-          if (existing === undefined || existing === null) return;
-
-          if (Array.isArray(existing)) {
-            const filtered = existing.filter(
-              (v: unknown) =>
-                !(typeof v === "string" && linksEqual(v, sourceLink)),
-            );
-            if (filtered.length === 0) {
-              delete fm[actualKey];
-            } else if (filtered.length === 1) {
-              fm[actualKey] = filtered[0];
-            } else {
-              fm[actualKey] = filtered;
-            }
-          } else if (
-            typeof existing === "string" &&
-            linksEqual(existing, sourceLink)
-          ) {
-            delete fm[actualKey];
-          }
+          changed = this.removeInverseFromFrontmatter(fm, inverseKey, sourceLink);
         },
       );
-      this.syncLog.push({ file: target.path, action: "removed", key: inverseKey, link: sourceLink });
+      if (changed) this.syncLog.push({ file: target.path, action: "removed", key: inverseKey, link: sourceLink });
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
       new Notice(`RelationSync: error updating "${target.basename}" — ${msg}`);
     }
+  }
+
+  private async applyBulkChanges(target: TFile, changes: PlannedSyncChange[]): Promise<void> {
+    this.writing.add(target.path);
+    this.setWritingGuardTimer(target.path);
+
+    try {
+      const applied: PlannedSyncChange[] = [];
+      await this.app.fileManager.processFrontMatter(
+        target,
+        (fm: Record<string, unknown>) => {
+          for (const change of changes) {
+            const changed = change.action === "added"
+              ? this.addInverseToFrontmatter(fm, change.key, change.link)
+              : this.removeInverseFromFrontmatter(fm, change.key, change.link);
+            if (changed) applied.push(change);
+          }
+        },
+      );
+      for (const change of applied) {
+        this.syncLog.push({
+          file: target.path,
+          action: change.action,
+          key: change.key,
+          link: change.link,
+        });
+      }
+    } catch (err: unknown) {
+      this.clearWritingGuard(target.path);
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(`RelationSync: error updating "${target.basename}" — ${msg}`);
+    }
+  }
+
+  private addInverseToFrontmatter(
+    fm: Record<string, unknown>,
+    inverseKey: string,
+    sourceLink: string,
+  ): boolean {
+    const actualKey = this.findActualKey(fm, inverseKey) ?? inverseKey;
+    const existing = fm[actualKey];
+
+    if (existing === undefined || existing === null) {
+      fm[actualKey] = sourceLink;
+      return true;
+    }
+
+    if (Array.isArray(existing)) {
+      const alreadyPresent = existing.some(
+        (v: unknown) =>
+          typeof v === "string" && linkTargetsEqual(v, sourceLink),
+      );
+      if (alreadyPresent) return false;
+      existing.push(sourceLink);
+      return true;
+    }
+
+    if (typeof existing === "string" && !linkTargetsEqual(existing, sourceLink)) {
+      fm[actualKey] = [existing, sourceLink];
+      return true;
+    }
+
+    return false;
+  }
+
+  private removeInverseFromFrontmatter(
+    fm: Record<string, unknown>,
+    inverseKey: string,
+    sourceLink: string,
+  ): boolean {
+    const actualKey = this.findActualKey(fm, inverseKey) ?? inverseKey;
+    const existing = fm[actualKey];
+    if (existing === undefined || existing === null) return false;
+
+    if (Array.isArray(existing)) {
+      const filtered = existing.filter(
+        (v: unknown) =>
+          !(typeof v === "string" && linkTargetsEqual(v, sourceLink)),
+      );
+      if (filtered.length === existing.length) return false;
+      if (filtered.length === 0) {
+        delete fm[actualKey];
+      } else if (filtered.length === 1) {
+        fm[actualKey] = filtered[0];
+      } else {
+        fm[actualKey] = filtered;
+      }
+      return true;
+    }
+
+    if (typeof existing === "string" && linkTargetsEqual(existing, sourceLink)) {
+      delete fm[actualKey];
+      return true;
+    }
+
+    return false;
   }
 }

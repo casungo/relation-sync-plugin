@@ -26,11 +26,43 @@ export const de: LocaleDefinition = {
       "Berechnet alle inversen Beziehungen in jeder Datei im Vault neu und fügt sie hinzu.",
     syncVaultButton: "Globale Synchronisierung ausführen",
     syncNotice: (count) => `RelationSync: Synchronisierung in ${count} Notizen abgeschlossen.`,
+    bulkSyncRunningNotice: "RelationSync: Massensynchronisierung läuft...",
+    bulkSyncFailedNotice: "RelationSync: Massensynchronisierung fehlgeschlagen.",
+
+    bulkPreviewTitle: "Vorschau der Massensynchronisierung",
+    bulkPreviewDesc: (changes, files) =>
+      `Prüfen Sie ${changes} geplante Änderungen in ${files} Notizen, bevor in den Vault geschrieben wird.`,
+    bulkPreviewTruncated: (count) => `${count} weitere Änderungen werden nicht angezeigt.`,
+    confirmBulkSyncButton: "Änderungen anwenden",
+    syncLogTitle: "Synchronisierungsprotokoll",
+    noSyncChanges: "Es wurden keine Änderungen vorgenommen.",
+    copyLogButton: "Protokoll kopieren",
+    copyLogNotice: "RelationSync: Protokoll kopiert.",
+    logFileColumn: "Datei",
+    logActionColumn: "Aktion",
+    logKeyColumn: "Schlüssel",
+    logLinkColumn: "Link",
+    cancelButton: "Abbrechen",
+    confirmButton: "Bestätigen",
+    openRelationsPanel: "Beziehungsbereich öffnen",
+
+    relationsPanelTitle: "Beziehungen",
+    relationsPanelNoFile: "Öffnen Sie eine Notiz, um ihre Beziehungen zu sehen.",
+    relationsPanelNoFrontmatter: "Diese Notiz hat kein Frontmatter.",
+    relationsPanelNoRelations: "Keine konfigurierten Beziehungen in dieser Notiz gefunden.",
+    relationsPanelRelationCount: (count) =>
+      count === 1 ? "1 verknüpfte Notiz" : `${count} verknüpfte Notizen`,
+    relationsPanelOpenNoteTooltip: "Notiz öffnen",
 
     exportPairs: "Beziehungspaare exportieren",
     exportPairsDesc:
       "Alle aktuellen Beziehungspaare als JSON-Datei im Vault-Stammverzeichnis speichern.",
     exportPairsButton: "Als JSON exportieren",
+
+    exportSuccess: (filename) => `RelationSync: nach ${filename} exportiert.`,
+    exportError: "RelationSync: Export fehlgeschlagen.",
+    exportOverwriteConfirm: (filename) =>
+      `${filename} existiert bereits im Vault-Stammverzeichnis.\n\nÜberschreiben?`,
     importPairs: "Beziehungspaare importieren",
     importPairsDesc:
       "Beziehungspaare aus einer JSON-Datei laden (wird mit vorhandenen Paaren zusammengeführt).",
@@ -55,6 +87,12 @@ export const de: LocaleDefinition = {
     inversePlaceholder: "invers (z. B. Freund von)",
     removePairTooltip: "Dieses Paar entfernen",
     togglePairTooltip: "Dieses Paar aktivieren / deaktivieren",
+
+    validationEmptyField: "Beide Beziehungsfelder sind erforderlich.",
+    validationSameField: "Vorwärts- und inverse Beziehung dürfen nicht identisch sein.",
+    validationDuplicatePair: "Dieses Beziehungspaar ist doppelt vorhanden.",
+    validationConflictingKey: (key) =>
+      `"${key}" wird bereits von einem anderen aktivierten Paar verwaltet.`,
 
     noSearchResults: "Keine Beziehungen entsprechen Ihrer Suche.",
     noRelations: 'Keine Beziehungen definiert. Klicken Sie auf "+ Paar hinzufügen", um eine zu erstellen.',

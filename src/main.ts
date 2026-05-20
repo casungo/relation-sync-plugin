@@ -1,7 +1,9 @@
-import { Plugin, TFile } from "obsidian";
+import { type App, Modal, Notice, Plugin, Setting, TFile } from "obsidian";
 import { type RelationSyncSettings, DEFAULT_SETTINGS } from "./types";
 import { SyncEngine } from "./sync-engine";
 import { RelationSyncSettingTab } from "./settings-tab";
+import { t } from "./locales";
+import { RelationPanelView, RELATION_PANEL_VIEW_TYPE } from "./relation-panel";
 
 export default class RelationSyncPlugin extends Plugin {
   settings!: RelationSyncSettings;
@@ -10,6 +12,11 @@ export default class RelationSyncPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
     this.engine = new SyncEngine(this.app, this.settings);
+
+    this.registerView(
+      RELATION_PANEL_VIEW_TYPE,
+      (leaf) => new RelationPanelView(leaf, this),
+    );
 
     // Snapshot vault once the workspace layout is ready.
     this.app.workspace.onLayoutReady(() => {
@@ -69,6 +76,18 @@ export default class RelationSyncPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "open-relations-panel",
+      name: t().openRelationsPanel,
+      callback: () => {
+        void this.activateRelationPanel();
+      },
+    });
+
+    this.addRibbonIcon("network", t().openRelationsPanel, () => {
+      void this.activateRelationPanel();
+    });
+
     this.addSettingTab(new RelationSyncSettingTab(this.app, this));
   }
 
@@ -89,16 +108,72 @@ export default class RelationSyncPlugin extends Plugin {
     this.engine.refreshMap(this.settings);
   }
 
-  private async runBulkSyncCommand(): Promise<void> {
-    const { Notice } = await import("obsidian");
-    const notice = new Notice("Relation sync: bulk sync running…", 0);
-    try {
-      const { count } = await this.engine.runBulkSync();
-      notice.hide();
-      new Notice(`Relation sync: sync completed on ${count} notes.`);
-    } catch {
-      notice.hide();
-      new Notice("Relation sync: bulk sync failed.");
+  private async activateRelationPanel(): Promise<void> {
+    const existingLeaf = this.app.workspace.getLeavesOfType(RELATION_PANEL_VIEW_TYPE)[0];
+    if (existingLeaf) {
+      this.app.workspace.revealLeaf(existingLeaf);
+      return;
     }
+
+    const leaf = this.app.workspace.getRightLeaf(false);
+    if (!leaf) return;
+
+    await leaf.setViewState({
+      type: RELATION_PANEL_VIEW_TYPE,
+      active: true,
+    });
+    this.app.workspace.revealLeaf(leaf);
+  }
+
+  private async runBulkSyncCommand(): Promise<void> {
+    const strings = t();
+    const plan = this.engine.previewBulkSync();
+    new BulkSyncCommandModal(this.app, plan.entries.length, plan.filesScanned, async () => {
+      const notice = new Notice(strings.bulkSyncRunningNotice, 0);
+      try {
+        const { count } = await this.engine.runBulkSync();
+        notice.hide();
+        new Notice(strings.syncNotice(count));
+      } catch {
+        notice.hide();
+        new Notice(strings.bulkSyncFailedNotice);
+      }
+    }).open();
+  }
+}
+
+class BulkSyncCommandModal extends Modal {
+  constructor(
+    app: App,
+    private readonly changes: number,
+    private readonly files: number,
+    private readonly onConfirm: () => Promise<void>,
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const strings = t();
+    this.contentEl.empty();
+    new Setting(this.contentEl).setName(strings.bulkPreviewTitle).setHeading();
+    this.contentEl.createEl("p", {
+      text: strings.bulkPreviewDesc(this.changes, this.files),
+      cls: "setting-item-description",
+    });
+    new Setting(this.contentEl)
+      .addButton((btn) => btn.setButtonText(strings.cancelButton).onClick(() => this.close()))
+      .addButton((btn) =>
+        btn
+          .setButtonText(strings.confirmBulkSyncButton)
+          .setWarning()
+          .onClick(() => {
+            void this.onConfirm();
+            this.close();
+          }),
+      );
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
   }
 }

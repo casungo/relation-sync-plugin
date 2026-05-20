@@ -44,11 +44,39 @@ export interface I18nStrings {
   syncVaultDesc: string;
   syncVaultButton: string;
   syncNotice: (count: number) => string;
+  bulkSyncRunningNotice: string;
+  bulkSyncFailedNotice: string;
+  bulkPreviewTitle: string;
+  bulkPreviewDesc: (changes: number, files: number) => string;
+  bulkPreviewTruncated: (count: number) => string;
+  confirmBulkSyncButton: string;
+  syncLogTitle: string;
+  noSyncChanges: string;
+  copyLogButton: string;
+  copyLogNotice: string;
+  logFileColumn: string;
+  logActionColumn: string;
+  logKeyColumn: string;
+  logLinkColumn: string;
+  cancelButton: string;
+  confirmButton: string;
+  openRelationsPanel: string;
+
+  // ── Relations panel
+  relationsPanelTitle: string;
+  relationsPanelNoFile: string;
+  relationsPanelNoFrontmatter: string;
+  relationsPanelNoRelations: string;
+  relationsPanelRelationCount: (count: number) => string;
+  relationsPanelOpenNoteTooltip: string;
 
   // ── Import / Export
   exportPairs: string;
   exportPairsDesc: string;
   exportPairsButton: string;
+  exportSuccess: (filename: string) => string;
+  exportError: string;
+  exportOverwriteConfirm: (filename: string) => string;
   importPairs: string;
   importPairsDesc: string;
   importPairsButton: string;
@@ -76,6 +104,10 @@ export interface I18nStrings {
   inversePlaceholder: string;
   removePairTooltip: string;
   togglePairTooltip: string;
+  validationEmptyField: string;
+  validationSameField: string;
+  validationDuplicatePair: string;
+  validationConflictingKey: (key: string) => string;
 
   // ── Empty state
   noSearchResults: string;

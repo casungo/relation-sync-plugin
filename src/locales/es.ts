@@ -26,11 +26,43 @@ export const es: LocaleDefinition = {
       "Vuelve a calcular y añade todas las relaciones inversas en cada archivo del vault.",
     syncVaultButton: "Ejecutar sincronización global",
     syncNotice: (count) => `RelationSync: sincronización completada en ${count} notas.`,
+    bulkSyncRunningNotice: "RelationSync: sincronización masiva en curso...",
+    bulkSyncFailedNotice: "RelationSync: la sincronización masiva falló.",
+
+    bulkPreviewTitle: "Vista previa de sincronización masiva",
+    bulkPreviewDesc: (changes, files) =>
+      `Revisa ${changes} cambios previstos en ${files} notas antes de escribir en el vault.`,
+    bulkPreviewTruncated: (count) => `${count} cambios más no se muestran.`,
+    confirmBulkSyncButton: "Aplicar cambios",
+    syncLogTitle: "Registro de sincronización",
+    noSyncChanges: "No se realizaron cambios.",
+    copyLogButton: "Copiar registro",
+    copyLogNotice: "RelationSync: registro copiado.",
+    logFileColumn: "Archivo",
+    logActionColumn: "Acción",
+    logKeyColumn: "Clave",
+    logLinkColumn: "Link",
+    cancelButton: "Cancelar",
+    confirmButton: "Confirmar",
+    openRelationsPanel: "Abrir panel de relaciones",
+
+    relationsPanelTitle: "Relaciones",
+    relationsPanelNoFile: "Abre una nota para ver sus relaciones.",
+    relationsPanelNoFrontmatter: "Esta nota no tiene frontmatter.",
+    relationsPanelNoRelations: "No se encontraron relaciones configuradas en esta nota.",
+    relationsPanelRelationCount: (count) =>
+      count === 1 ? "1 nota relacionada" : `${count} notas relacionadas`,
+    relationsPanelOpenNoteTooltip: "Abrir nota",
 
     exportPairs: "Exportar pares de relaciones",
     exportPairsDesc:
       "Guarda todos los pares de relaciones actuales en un archivo JSON en la raíz del vault.",
     exportPairsButton: "Exportar a JSON",
+
+    exportSuccess: (filename) => `RelationSync: exportado a ${filename}.`,
+    exportError: "RelationSync: exportación fallida.",
+    exportOverwriteConfirm: (filename) =>
+      `${filename} ya existe en la raíz del vault.\n\n¿Sobrescribirlo?`,
     importPairs: "Importar pares de relaciones",
     importPairsDesc:
       "Carga pares de relaciones desde un archivo JSON (se fusionan con los pares existentes).",
@@ -55,6 +87,12 @@ export const es: LocaleDefinition = {
     inversePlaceholder: "inverso (ej. amigo de)",
     removePairTooltip: "Eliminar esta pareja",
     togglePairTooltip: "Activar / desactivar este par",
+
+    validationEmptyField: "Ambos campos de relación son obligatorios.",
+    validationSameField: "La relación directa y la inversa no pueden ser iguales.",
+    validationDuplicatePair: "Este par de relaciones está duplicado.",
+    validationConflictingKey: (key) =>
+      `"${key}" ya está gestionada por otro par habilitado.`,
 
     noSearchResults: "Ninguna relación coincide con tu búsqueda.",
     noRelations: 'No hay relaciones definidas. Haz clic en "+ Añadir pareja" para crear una.',

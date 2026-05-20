@@ -87,6 +87,15 @@
   text-decoration: line-through;
 }
 
+.relation-sync-row--invalid {
+  border-left: 3px solid var(--text-warning);
+}
+
+.relation-sync-validation {
+  color: var(--text-warning);
+  font-size: var(--font-ui-smaller);
+}
+
 /* ── Arrow ─────────────────────────────────────────────────── */
 .relation-sync-arrow {
   align-self: center;
@@ -118,3 +127,98 @@
 }
 .sync-log-added  { color: var(--color-green, #4caf50); font-weight: 600; }
 .sync-log-removed { color: var(--color-red, #f44336); font-weight: 600; }
+
+.relation-sync-preview-table {
+  max-height: 45vh;
+  display: block;
+  overflow: auto;
+}
+
+/* ── Relations panel ──────────────────────────────────────── */
+.relation-sync-panel {
+  padding: 12px;
+}
+
+.relation-sync-panel-title {
+  margin: 0 0 8px;
+  font-size: var(--font-ui-large);
+}
+
+.relation-sync-panel-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-bottom: 10px;
+}
+
+.relation-sync-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.relation-sync-panel-item {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  padding: 8px;
+  background: var(--background-primary);
+}
+
+.relation-sync-panel-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.relation-sync-panel-link {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-accent);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.relation-sync-panel-link:hover {
+  color: var(--text-accent-hover);
+  text-decoration: underline;
+}
+
+.relation-sync-panel-badge {
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.relation-sync-panel-relations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.relation-sync-panel-chip {
+  max-width: 100%;
+  padding: 2px 7px;
+  border-radius: var(--radius-s, 6px);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  overflow-wrap: anywhere;
+}
+
+.relation-sync-panel-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  padding: 24px 4px;
+  text-align: center;
+}
