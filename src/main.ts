@@ -131,9 +131,9 @@ export default class RelationSyncPlugin extends Plugin {
     new BulkSyncCommandModal(this.app, plan.entries.length, plan.filesScanned, async () => {
       const notice = new Notice(strings.bulkSyncRunningNotice, 0);
       try {
-        const { count } = await this.engine.runBulkSync();
+        const { count, log, cancelled } = await this.engine.runBulkSync();
         notice.hide();
-        new Notice(strings.syncNotice(count));
+        new Notice(cancelled ? strings.bulkSyncCancelledNotice(log.length) : strings.syncNotice(count));
       } catch {
         notice.hide();
         new Notice(strings.bulkSyncFailedNotice);

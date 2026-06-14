@@ -32,6 +32,8 @@ export const ja: LocaleDefinition = {
     bulkPreviewTitle: "一括同期のプレビュー",
     bulkPreviewDesc: (changes, files) =>
       `保管庫に書き込む前に、${files} 件のノートに対する ${changes} 件の予定変更を確認してください。`,
+    bulkPreviewSummary: (files, added, removed) =>
+      `${files} 件のファイルが変更されます: 追加 ${added} 件、削除 ${removed} 件。`,
     bulkPreviewTruncated: (count) => `さらに ${count} 件の変更は表示されていません。`,
     confirmBulkSyncButton: "変更を適用",
     syncLogTitle: "同期ログ",
@@ -45,6 +47,28 @@ export const ja: LocaleDefinition = {
     cancelButton: "キャンセル",
     confirmButton: "確認",
     openRelationsPanel: "関係パネルを開く",
+    syncEnabled: "自動同期",
+    syncEnabledDesc:
+      "オフの場合、Relation Sync は変更を監視しますが逆関係を書き込みません。",
+    viewRecentLog: "最近の同期ログ",
+    viewRecentLogDesc: "最近の自動同期と一括同期の書き込みを確認します。",
+    viewRecentLogButton: "ログを表示",
+    undoLastSync: "最後の同期を元に戻す",
+    undoLastSyncDesc:
+      "Relation Sync が最後に書き込んだ変更セットを元に戻します。後でログを確認してください。",
+    undoLastSyncButton: "最後の同期を元に戻す",
+    undoLastSyncConfirm:
+      "Relation Sync が最後に書き込んだ変更セットを元に戻します。\n\n続行しますか？",
+    undoLastSyncNotice: (count) =>
+      `RelationSync: ${count} 件の同期変更を元に戻しました。`,
+    noUndoAvailable: "RelationSync: 元に戻せる同期変更はありません。",
+    configInvalidTitle: "設定を確認してください",
+    configInvalidDesc:
+      "空、重複、競合している有効なペアを修正するまで、自動書き込みは無効です。",
+    bulkProgress: (filesDone, filesTotal, changes) =>
+      `RelationSync: ${filesDone}/${filesTotal} ファイルを同期しました（${changes} 件適用）。`,
+    bulkSyncCancelledNotice: (changes) =>
+      `RelationSync: ${changes} 件の変更後に一括同期をキャンセルしました。`,
 
     relationsPanelTitle: "関係",
     relationsPanelNoFile: "関係を表示するにはノートを開いてください。",
@@ -100,6 +124,16 @@ export const ja: LocaleDefinition = {
     showAllLanguages: "すべての言語を表示",
     showAllLanguagesDesc:
       "オフの場合、設定されている言語に一致する関係のみが表示されます。オンにするとすべて表示されます。",
+    enableVisibleCategory: "カテゴリを有効化",
+    disableVisibleCategory: "カテゴリを無効化",
+    enableCurrentLanguage: "この言語を有効化",
+    enableCurrentLanguageDesc:
+      "現在の Obsidian 言語の組み込み関係ペアをすべて有効にします。",
+    disableOtherLanguages: "他の言語を無効化",
+    disableOtherLanguagesDesc:
+      "カスタムペアと現在の言語は有効のまま、他の言語パックを無効にします。",
+    duplicateImportSkipped: (added, skipped) =>
+      `RelationSync: ${added} ペアをインポートし、${skipped} 件の重複をスキップしました。`,
 
     catFamily: "👨‍👩‍👧‍👦 家族",
     catRomantic: "💕 恋愛",

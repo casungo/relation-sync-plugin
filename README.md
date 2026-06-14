@@ -41,6 +41,52 @@ child: [[John Doe]]
 
 If you later change or remove the link, the plugin updates the corresponding inverse relation automatically, ensuring your graph remains perfectly consistent.
 
+## 🛡️ Safe First Run
+
+Relation Sync writes to YAML frontmatter, so start conservatively:
+
+1. Back up or version your vault before the first global sync.
+2. Open **Settings → Relation Sync** and confirm **Automatic sync** is enabled only when you are ready.
+3. Review the enabled relation pairs for your language. Other bundled language packs are installed but disabled by default.
+4. Use **Sync entire vault** to preview planned changes before writing.
+5. After any sync, open **Recent sync log** to inspect what changed. If the latest sync batch was not what you expected, use **Undo last sync** before making more sync changes.
+
+Automatic sync can be paused at any time. When paused, the plugin continues tracking note metadata but does not write inverse relations.
+
+## 🧾 Supported Frontmatter
+
+Relation fields can be single wiki links:
+
+```yaml
+---
+parent of: [[Alice]]
+---
+```
+
+Or arrays of wiki links:
+
+```yaml
+---
+parent of:
+  - [[Alice]]
+  - [[Bob|Bobby]]
+---
+```
+
+Relation Sync resolves standard Obsidian wiki links, including aliases, headings, basename links, and path-qualified links. Non-string values in relation arrays are preserved, but only wiki-link strings are treated as relation targets.
+
+## ⚙️ Configuration
+
+- **Relation pairs** define the forward and inverse YAML keys. For example, `parent of` maps to `child of`.
+- **Automatic sync** controls live writes after note edits and renames.
+- **Recent sync log** shows recent automatic and bulk writes.
+- **Undo last sync** reverses the latest Relation Sync write batch.
+- **Exclude paths** accepts comma-separated vault paths such as `Templates, Archive/old`.
+- **Language packs** are visible in settings. Only the current Obsidian language's non-conflicting default pairs are enabled by default; other bundled languages are available but disabled.
+- **Import/export** lets you move relation-pair presets between vaults. Imported duplicate pairs are skipped.
+
+If enabled relation pairs contain empty fields, exact duplicates, or conflicting mappings, automatic relation writes are disabled until the configuration is fixed.
+
 ---
 
 ## 📂 Supported Categories
@@ -56,6 +102,18 @@ The plugin comes with a rich set of defaults grouped by category:
 | **Education** | Teacher ↔ Student, Classmate, Mentor ↔ Mentee |
 | **Creative** | Collaborator, Rival, Muse |
 | **Social** | Neighbor, Acquaintance, Roommate |
+
+## 🔎 Relations Panel
+
+Use the ribbon icon or command palette action **Open relations panel** to see configured relations for the active note. The panel groups related notes, shows the relation keys that connect them, and opens target notes directly.
+
+## ⚠️ Limitations
+
+- Relation targets must already resolve to existing Markdown notes. The plugin does not create missing target notes.
+- Sync is based on frontmatter wiki links, not inline body links.
+- The undo action only reverses the latest Relation Sync write batch kept in memory during the current plugin session.
+- Some bundled relation variants are intentionally disabled by default when enabling all of them would make a YAML key ambiguous.
+- Bulk sync and rename handling scan Markdown files in the vault; large vaults should use the preview, progress, and cancel controls.
 
 ---
 
@@ -83,6 +141,19 @@ If you want to build the plugin yourself or contribute:
 2. Run `npm install` to install dependencies.
 3. Run `npm run dev` to start the build process in watch mode.
 4. Run `npm run build` for a production release.
+
+### Verification Matrix
+
+Before changing sync behavior, verify:
+
+- single relation value
+- multiple relation values
+- removing a relation
+- renamed or moved target notes
+- reciprocal relation pairs
+- excluded folders/files
+- missing target frontmatter
+- bulk sync preview and cancellation
 
 ---
 

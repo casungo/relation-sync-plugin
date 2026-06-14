@@ -1,6 +1,14 @@
 import { type App, type CachedMetadata, Notice, TFile } from "obsidian";
 import type { RelationSyncSettings } from "./types";
 import { buildRelationMap } from "./relation-map";
+import { validateRelationPairs } from "./validation";
+import {
+  addInverseToFrontmatter,
+  findActualKey,
+  getExistingStringValues,
+  removeInverseFromFrontmatter,
+} from "./frontmatter-ops";
+import { isExcludedPath } from "./path-rules";
 import {
   debounce,
   linkTargetsEqual,
@@ -29,6 +37,15 @@ export interface SyncLogEntry {
 export interface BulkSyncPlan {
   filesScanned: number;
   entries: SyncLogEntry[];
+  filesToChange: number;
+  added: number;
+  removed: number;
+}
+
+export interface BulkSyncProgress {
+  filesChanged: number;
+  totalFilesToChange: number;
+  changesApplied: number;
 }
 
 interface PlannedSyncChange extends SyncLogEntry {
@@ -74,10 +91,19 @@ export class SyncEngine {
   /** Log entries from the most recent operation. */
   private syncLog: SyncLogEntry[] = [];
 
+  /** Recent applied changes shown in settings and the relations panel. */
+  private recentLog: SyncLogEntry[] = [];
+
+  /** Last coherent write batch that can be reversed. */
+  private lastUndoBatch: SyncLogEntry[] = [];
+
+  /** Active batch collector for automatic or bulk sync operations. */
+  private activeBatch: SyncLogEntry[] | null = null;
+
   constructor(app: App, settings: RelationSyncSettings) {
     this.app = app;
     this.settings = settings;
-    this.relationMap = buildRelationMap(settings.relations);
+    this.relationMap = this.createValidatedRelationMap(settings);
     this.debouncedFlush = debounce(() => {
       void this.flushQueue();
     }, DEBOUNCE_MS);
@@ -88,7 +114,7 @@ export class SyncEngine {
   /** Rebuild the relation map after a settings change. */
   refreshMap(settings: RelationSyncSettings): void {
     this.settings = settings;
-    this.relationMap = buildRelationMap(settings.relations);
+    this.relationMap = this.createValidatedRelationMap(settings);
   }
 
   /** Take a snapshot of every markdown file's frontmatter. */
@@ -103,6 +129,11 @@ export class SyncEngine {
 
   /** Handle a metadata-cache change event (debounced). */
   handleMetaChanged(file: TFile, cache: CachedMetadata): void {
+    if (!this.settings.syncEnabled) {
+      this.prevFm.set(file.path, { ...(cache.frontmatter ?? {}) });
+      return;
+    }
+
     // Skip our own writes — clear the guard flag when we see its echo.
     if (this.writing.has(file.path)) {
       this.clearWritingGuard(file.path);
@@ -124,6 +155,8 @@ export class SyncEngine {
    * Updates all notes in the vault that reference the old name's link.
    */
   async handleFileRenamed(file: TFile, oldPath: string): Promise<void> {
+    if (!this.settings.syncEnabled) return;
+
     // Update our snapshot key
     const snap = this.prevFm.get(oldPath);
     this.prevFm.delete(oldPath);
@@ -174,8 +207,12 @@ export class SyncEngine {
   /** Compute the changes a full vault sync would apply. */
   previewBulkSync(): BulkSyncPlan {
     const planned = this.createBulkSyncPlan();
+    const changedFiles = new Set(planned.entries.map((entry) => entry.file));
     return {
       filesScanned: planned.filesScanned,
+      filesToChange: changedFiles.size,
+      added: planned.entries.filter((entry) => entry.action === "added").length,
+      removed: planned.entries.filter((entry) => entry.action === "removed").length,
       entries: planned.entries.map((entry) => ({
         file: entry.file,
         action: entry.action,
@@ -186,7 +223,9 @@ export class SyncEngine {
   }
 
   /** Run a full vault sync — re-computes all inverse relations from scratch. */
-  async runBulkSync(): Promise<{ count: number; log: SyncLogEntry[] }> {
+  async runBulkSync(
+    onProgress?: (progress: BulkSyncProgress) => void,
+  ): Promise<{ count: number; log: SyncLogEntry[]; cancelled: boolean }> {
     this.bulkSyncAbort = false;
     this.syncLog = [];
 
@@ -200,14 +239,25 @@ export class SyncEngine {
       changesByFile.set(entry.file, changes);
     }
 
+    this.beginBatch();
+    let filesChanged = 0;
+    let changesApplied = 0;
     for (const [path, changes] of changesByFile) {
       if (this.bulkSyncAbort) break;
       const target = this.app.vault.getAbstractFileByPath(path);
       if (!(target instanceof TFile)) continue;
       await this.applyBulkChanges(target, changes);
+      filesChanged++;
+      changesApplied += changes.length;
+      onProgress?.({
+        filesChanged,
+        totalFilesToChange: changesByFile.size,
+        changesApplied,
+      });
     }
+    this.endBatch();
     this.snapshotVault();
-    return { count: plan.filesScanned, log: [...this.syncLog] };
+    return { count: plan.filesScanned, log: [...this.syncLog], cancelled: this.bulkSyncAbort };
   }
 
   /** Cancel an in-progress bulk sync. */
@@ -220,6 +270,43 @@ export class SyncEngine {
     const log = [...this.syncLog];
     this.syncLog = [];
     return log;
+  }
+
+  /** Return recent automatic and bulk sync changes without clearing them. */
+  getRecentLog(): SyncLogEntry[] {
+    return [...this.recentLog];
+  }
+
+  /** Whether a reversible write batch is available. */
+  canUndoLastSync(): boolean {
+    return this.lastUndoBatch.length > 0;
+  }
+
+  /** Reverse the most recent sync batch. */
+  async undoLastSync(): Promise<{ count: number; log: SyncLogEntry[] }> {
+    const batch = [...this.lastUndoBatch].reverse();
+    if (batch.length === 0) return { count: 0, log: [] };
+
+    const undoLog: SyncLogEntry[] = [];
+    const changesByFile = new Map<string, SyncLogEntry[]>();
+    for (const entry of batch) {
+      const changes = changesByFile.get(entry.file) ?? [];
+      changes.push(entry);
+      changesByFile.set(entry.file, changes);
+    }
+
+    for (const [path, changes] of changesByFile) {
+      const target = this.app.vault.getAbstractFileByPath(path);
+      if (!(target instanceof TFile)) continue;
+      await this.applyUndoChanges(target, changes, undoLog);
+    }
+
+    this.lastUndoBatch = [];
+    this.syncLog = undoLog;
+    this.recentLog.unshift(...undoLog);
+    this.recentLog = this.recentLog.slice(0, 200);
+    this.snapshotVault();
+    return { count: undoLog.length, log: undoLog };
   }
 
   /** Clean up timers and state. */
@@ -237,11 +324,7 @@ export class SyncEngine {
 
   /** Check whether a file path should be skipped based on excludePaths setting. */
   private isExcluded(filePath: string): boolean {
-    const raw = this.settings.excludePaths ?? "";
-    if (!raw.trim()) return false;
-    const patterns = raw.split(",").map((p) => p.trim().toLowerCase()).filter(Boolean);
-    const lower = filePath.toLowerCase();
-    return patterns.some((p) => lower === p || lower.startsWith(p + "/") || lower.startsWith(p + "\\"));
+    return isExcludedPath(filePath, this.settings.excludePaths ?? "");
   }
 
   /** Set the writing guard and arm its safety-net timeout. */
@@ -302,44 +385,49 @@ export class SyncEngine {
   ): Promise<void> {
     const fm = cache.frontmatter ?? {};
     const prev = this.prevFm.get(file.path) ?? {};
+    this.beginBatch();
 
-    // Gather all keys that are known relation keys.
-    const allKeys = new Set([
-      ...Object.keys(fm).map((k) => k.toLowerCase()),
-      ...Object.keys(prev).map((k) => k.toLowerCase()),
-    ]);
+    try {
+      // Gather all keys that are known relation keys.
+      const allKeys = new Set([
+        ...Object.keys(fm).map((k) => k.toLowerCase()),
+        ...Object.keys(prev).map((k) => k.toLowerCase()),
+      ]);
 
-    for (const key of allKeys) {
-      const inverseKey = this.relationMap.get(key);
-      if (!inverseKey) continue;
+      for (const key of allKeys) {
+        const inverseKey = this.relationMap.get(key);
+        if (!inverseKey) continue;
 
-      // Find original casing in `fm` or `prev`
-      // We look for the exact string the user typed so we can reflect its casing
-      const originalKey = Object.keys(fm).find((k) => k.toLowerCase() === key) ?? 
-                          Object.keys(prev).find((k) => k.toLowerCase() === key) ?? key;
-      const dynamicInverseKey = matchCasing(originalKey, inverseKey);
+        // Find original casing in `fm` or `prev`
+        // We look for the exact string the user typed so we can reflect its casing
+        const originalKey = Object.keys(fm).find((k) => k.toLowerCase() === key) ?? 
+                            Object.keys(prev).find((k) => k.toLowerCase() === key) ?? key;
+        const dynamicInverseKey = matchCasing(originalKey, inverseKey);
 
-      const cachedLinks = this.getLinksViaCache(cache, key);
-      const currentLinks = cachedLinks.length > 0 ? cachedLinks : this.getLinksFromRaw(fm, key);
-      const prevLinks = this.getLinksFromRaw(prev, key);
+        const cachedLinks = this.getLinksViaCache(cache, key);
+        const currentLinks = cachedLinks.length > 0 ? cachedLinks : this.getLinksFromRaw(fm, key);
+        const prevLinks = this.getLinksFromRaw(prev, key);
 
-      const added = currentLinks.filter(
-        (l) => !prevLinks.some((p) => this.resolvedLinksEqual(l, p, file.path)),
-      );
-      const removed = prevLinks.filter(
-        (l) => !currentLinks.some((c) => this.resolvedLinksEqual(l, c, file.path)),
-      );
+        const added = currentLinks.filter(
+          (l) => !prevLinks.some((p) => this.resolvedLinksEqual(l, p, file.path)),
+        );
+        const removed = prevLinks.filter(
+          (l) => !currentLinks.some((c) => this.resolvedLinksEqual(l, c, file.path)),
+        );
 
-      for (const name of added) {
-        await this.addInverse(file, name, dynamicInverseKey);
+        for (const name of added) {
+          await this.addInverse(file, name, dynamicInverseKey);
+        }
+        for (const name of removed) {
+          await this.removeInverse(file, name, dynamicInverseKey);
+        }
       }
-      for (const name of removed) {
-        await this.removeInverse(file, name, dynamicInverseKey);
-      }
+
+      // Update snapshot.
+      this.prevFm.set(file.path, { ...fm });
+    } finally {
+      this.endBatch();
     }
-
-    // Update snapshot.
-    this.prevFm.set(file.path, { ...fm });
   }
 
   /**
@@ -431,7 +519,7 @@ export class SyncEngine {
         if (!this.relationMap.has(key)) continue;
         const existingLinks = this.getLinksViaCache(cache, key);
         const links = existingLinks.length > 0 ? existingLinks : this.getLinksFromRaw(fm, key);
-        const existingValues = this.getExistingStringValues(fm[rawKey]);
+          const existingValues = getExistingStringValues(fm[rawKey]);
         for (const linkTarget of links) {
           const source = this.app.metadataCache.getFirstLinkpathDest(linkTarget, targetFile.path);
           if (!(source instanceof TFile)) continue;
@@ -451,7 +539,7 @@ export class SyncEngine {
           if (!(target instanceof TFile)) continue;
           const cache = this.app.metadataCache.getFileCache(target);
           const fm = cache?.frontmatter ?? {};
-          const actualKey = this.findActualKey(fm, change.key);
+          const actualKey = findActualKey(fm, change.key);
           const existingLinks = actualKey ? parseWikiLinks(fm[actualKey]) : [];
           const alreadyPresent = existingLinks.some((value) =>
             this.resolvedLinksEqual(value, change.link, target.path),
@@ -468,17 +556,6 @@ export class SyncEngine {
       a.link.localeCompare(b.link),
     );
     return { filesScanned, entries };
-  }
-
-  private getExistingStringValues(value: unknown): string[] {
-    if (typeof value === "string") return [value];
-    if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
-    return [];
-  }
-
-  private findActualKey(fm: Record<string, unknown>, key: string): string | undefined {
-    const lowerKey = key.toLowerCase();
-    return Object.keys(fm).find((candidate) => candidate.toLowerCase() === lowerKey);
   }
 
   private makeLinkToFile(file: TFile, sourcePath: string): string {
@@ -515,10 +592,10 @@ export class SyncEngine {
       await this.app.fileManager.processFrontMatter(
         target,
         (fm: Record<string, unknown>) => {
-          changed = this.addInverseToFrontmatter(fm, inverseKey, sourceLink);
+          changed = addInverseToFrontmatter(fm, inverseKey, sourceLink);
         },
       );
-      if (changed) this.syncLog.push({ file: target.path, action: "added", key: inverseKey, link: sourceLink });
+      if (changed) this.recordChange({ file: target.path, action: "added", key: inverseKey, link: sourceLink });
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
@@ -555,10 +632,10 @@ export class SyncEngine {
       await this.app.fileManager.processFrontMatter(
         target,
         (fm: Record<string, unknown>) => {
-          changed = this.removeInverseFromFrontmatter(fm, inverseKey, sourceLink);
+          changed = removeInverseFromFrontmatter(fm, inverseKey, sourceLink);
         },
       );
-      if (changed) this.syncLog.push({ file: target.path, action: "removed", key: inverseKey, link: sourceLink });
+      if (changed) this.recordChange({ file: target.path, action: "removed", key: inverseKey, link: sourceLink });
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
@@ -577,14 +654,14 @@ export class SyncEngine {
         (fm: Record<string, unknown>) => {
           for (const change of changes) {
             const changed = change.action === "added"
-              ? this.addInverseToFrontmatter(fm, change.key, change.link)
-              : this.removeInverseFromFrontmatter(fm, change.key, change.link);
+              ? addInverseToFrontmatter(fm, change.key, change.link)
+              : removeInverseFromFrontmatter(fm, change.key, change.link);
             if (changed) applied.push(change);
           }
         },
       );
       for (const change of applied) {
-        this.syncLog.push({
+        this.recordChange({
           file: target.path,
           action: change.action,
           key: change.key,
@@ -598,67 +675,72 @@ export class SyncEngine {
     }
   }
 
-  private addInverseToFrontmatter(
-    fm: Record<string, unknown>,
-    inverseKey: string,
-    sourceLink: string,
-  ): boolean {
-    const actualKey = this.findActualKey(fm, inverseKey) ?? inverseKey;
-    const existing = fm[actualKey];
-
-    if (existing === undefined || existing === null) {
-      fm[actualKey] = sourceLink;
-      return true;
-    }
-
-    if (Array.isArray(existing)) {
-      const alreadyPresent = existing.some(
-        (v: unknown) =>
-          typeof v === "string" && linkTargetsEqual(v, sourceLink),
-      );
-      if (alreadyPresent) return false;
-      existing.push(sourceLink);
-      return true;
-    }
-
-    if (typeof existing === "string" && !linkTargetsEqual(existing, sourceLink)) {
-      fm[actualKey] = [existing, sourceLink];
-      return true;
-    }
-
-    return false;
+  private beginBatch(): void {
+    this.activeBatch = [];
   }
 
-  private removeInverseFromFrontmatter(
-    fm: Record<string, unknown>,
-    inverseKey: string,
-    sourceLink: string,
-  ): boolean {
-    const actualKey = this.findActualKey(fm, inverseKey) ?? inverseKey;
-    const existing = fm[actualKey];
-    if (existing === undefined || existing === null) return false;
-
-    if (Array.isArray(existing)) {
-      const filtered = existing.filter(
-        (v: unknown) =>
-          !(typeof v === "string" && linkTargetsEqual(v, sourceLink)),
-      );
-      if (filtered.length === existing.length) return false;
-      if (filtered.length === 0) {
-        delete fm[actualKey];
-      } else if (filtered.length === 1) {
-        fm[actualKey] = filtered[0];
-      } else {
-        fm[actualKey] = filtered;
-      }
-      return true;
+  private endBatch(): void {
+    if (this.activeBatch && this.activeBatch.length > 0) {
+      this.lastUndoBatch = [...this.activeBatch];
     }
-
-    if (typeof existing === "string" && linkTargetsEqual(existing, sourceLink)) {
-      delete fm[actualKey];
-      return true;
-    }
-
-    return false;
+    this.activeBatch = null;
   }
+
+  private recordChange(entry: SyncLogEntry): void {
+    this.syncLog.push(entry);
+    this.recentLog.unshift(entry);
+    this.recentLog = this.recentLog.slice(0, 200);
+    if (this.activeBatch) {
+      this.activeBatch.push(entry);
+    } else {
+      this.lastUndoBatch = [entry];
+    }
+  }
+
+  private async applyUndoChanges(
+    target: TFile,
+    changes: SyncLogEntry[],
+    undoLog: SyncLogEntry[],
+  ): Promise<void> {
+    this.writing.add(target.path);
+    this.setWritingGuardTimer(target.path);
+
+    try {
+      await this.app.fileManager.processFrontMatter(
+        target,
+        (fm: Record<string, unknown>) => {
+          for (const change of changes) {
+            const undoAction = change.action === "added" ? "removed" : "added";
+            const changed = undoAction === "added"
+              ? addInverseToFrontmatter(fm, change.key, change.link)
+              : removeInverseFromFrontmatter(fm, change.key, change.link);
+            if (changed) {
+              undoLog.push({
+                file: target.path,
+                action: undoAction,
+                key: change.key,
+                link: change.link,
+              });
+            }
+          }
+        },
+      );
+    } catch (err: unknown) {
+      this.clearWritingGuard(target.path);
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(`RelationSync: error undoing changes in "${target.basename}" — ${msg}`);
+    }
+  }
+
+  private createValidatedRelationMap(settings: RelationSyncSettings): Map<string, string> {
+    const issues = validateRelationPairs(settings.relations, {
+      emptyField: "empty",
+      sameField: "same",
+      duplicatePair: "duplicate",
+      conflictingKey: () => "conflict",
+    });
+    if (issues.length > 0) return new Map();
+    return buildRelationMap(settings.relations);
+  }
+
 }

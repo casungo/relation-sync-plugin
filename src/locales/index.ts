@@ -92,6 +92,55 @@ export function getAllRelations(): RelationPair[] {
   return result;
 }
 
+/** Get relation pairs for a single locale. Falls back to English. */
+export function getRelationsForLocale(code?: string): RelationPair[] {
+  return flattenLocale(getLocale(code)).map((pair) => ({ ...pair }));
+}
+
+/**
+ * Get every bundled relation pair, but enable only the user's current locale.
+ * This keeps language packs visible/importable without syncing hidden keys.
+ */
+export function getDefaultRelations(code?: string): RelationPair[] {
+  const enabledLocale = getLocale(code).code.toLowerCase();
+  const result: RelationPair[] = [];
+  const enabledMappings = new Map<string, string>();
+
+  const canEnable = (pair: RelationPair): boolean => {
+    const forward = pair.forward.trim().toLowerCase();
+    const inverse = pair.inverse.trim().toLowerCase();
+    if (!forward || !inverse) return false;
+
+    const mappings = [
+      { key: forward, target: inverse },
+      { key: inverse, target: forward },
+    ];
+    return mappings.every((mapping) => {
+      const existing = enabledMappings.get(mapping.key);
+      return !existing || existing === mapping.target;
+    });
+  };
+
+  const rememberEnabled = (pair: RelationPair): void => {
+    const forward = pair.forward.trim().toLowerCase();
+    const inverse = pair.inverse.trim().toLowerCase();
+    enabledMappings.set(forward, inverse);
+    enabledMappings.set(inverse, forward);
+  };
+
+  for (const [localeCode, def] of Object.entries(LOCALES)) {
+    for (const pair of flattenLocale(def)) {
+      const shouldEnable = localeCode === enabledLocale && canEnable(pair);
+      if (shouldEnable) rememberEnabled(pair);
+      result.push({
+        ...pair,
+        enabled: shouldEnable,
+      });
+    }
+  }
+  return result;
+}
+
 // ── Category helpers ─────────────────────────────────────────────────────
 
 /**

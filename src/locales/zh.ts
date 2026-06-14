@@ -29,6 +29,8 @@ export const zh: LocaleDefinition = {
     bulkPreviewTitle: "批量同步预览",
     bulkPreviewDesc: (changes, files) =>
       `写入仓库前，请检查 ${files} 篇笔记中的 ${changes} 项计划更改。`,
+    bulkPreviewSummary: (files, added, removed) =>
+      `${files} 个文件将更改：新增 ${added} 项，移除 ${removed} 项。`,
     bulkPreviewTruncated: (count) => `还有 ${count} 项更改未显示。`,
     confirmBulkSyncButton: "应用更改",
     syncLogTitle: "同步日志",
@@ -42,6 +44,28 @@ export const zh: LocaleDefinition = {
     cancelButton: "取消",
     confirmButton: "确认",
     openRelationsPanel: "打开关系面板",
+    syncEnabled: "自动同步",
+    syncEnabledDesc:
+      "关闭后，Relation Sync 会观察更改，但不会写入逆关系。",
+    viewRecentLog: "最近同步日志",
+    viewRecentLogDesc: "查看最近的自动同步和批量同步写入。",
+    viewRecentLogButton: "查看日志",
+    undoLastSync: "撤销上次同步",
+    undoLastSyncDesc:
+      "反转 Relation Sync 上一次写入的更改批次。之后请查看日志。",
+    undoLastSyncButton: "撤销上次同步",
+    undoLastSyncConfirm:
+      "这将反转 Relation Sync 上一次写入的更改批次。\n\n是否继续？",
+    undoLastSyncNotice: (count) =>
+      `RelationSync: 已撤销 ${count} 项同步更改。`,
+    noUndoAvailable: "RelationSync: 没有可撤销的同步批次。",
+    configInvalidTitle: "配置需要处理",
+    configInvalidDesc:
+      "在修复空值、重复或冲突的已启用关系对之前，自动写入会被禁用。",
+    bulkProgress: (filesDone, filesTotal, changes) =>
+      `RelationSync: 已同步 ${filesDone}/${filesTotal} 个文件（应用 ${changes} 项更改）。`,
+    bulkSyncCancelledNotice: (changes) =>
+      `RelationSync: 批量同步已取消，已应用 ${changes} 项更改。`,
 
     relationsPanelTitle: "关系",
     relationsPanelNoFile: "打开一篇笔记以查看其关系。",
@@ -96,6 +120,16 @@ export const zh: LocaleDefinition = {
 
     showAllLanguages: "显示所有语言",
     showAllLanguagesDesc: "关闭时，仅显示与你的语言匹配的关系。开启后显示全部。",
+    enableVisibleCategory: "启用类别",
+    disableVisibleCategory: "禁用类别",
+    enableCurrentLanguage: "启用当前语言",
+    enableCurrentLanguageDesc:
+      "启用当前 Obsidian 语言的所有内置关系对。",
+    disableOtherLanguages: "禁用其他语言",
+    disableOtherLanguagesDesc:
+      "保留自定义关系对和当前语言启用；关闭其他内置语言包。",
+    duplicateImportSkipped: (added, skipped) =>
+      `RelationSync: 已导入 ${added} 对关系；跳过 ${skipped} 个重复项。`,
 
     catFamily: "👨‍👩‍👧‍👦 家庭",
     catRomantic: "💕 浪漫",

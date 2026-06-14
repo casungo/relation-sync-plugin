@@ -32,6 +32,8 @@ export const de: LocaleDefinition = {
     bulkPreviewTitle: "Vorschau der Massensynchronisierung",
     bulkPreviewDesc: (changes, files) =>
       `Prüfen Sie ${changes} geplante Änderungen in ${files} Notizen, bevor in den Vault geschrieben wird.`,
+    bulkPreviewSummary: (files, added, removed) =>
+      `${files} Dateien werden geändert: ${added} Ergänzungen, ${removed} Entfernungen.`,
     bulkPreviewTruncated: (count) => `${count} weitere Änderungen werden nicht angezeigt.`,
     confirmBulkSyncButton: "Änderungen anwenden",
     syncLogTitle: "Synchronisierungsprotokoll",
@@ -45,6 +47,28 @@ export const de: LocaleDefinition = {
     cancelButton: "Abbrechen",
     confirmButton: "Bestätigen",
     openRelationsPanel: "Beziehungsbereich öffnen",
+    syncEnabled: "Automatische Synchronisierung",
+    syncEnabledDesc:
+      "Wenn deaktiviert, beobachtet Relation Sync Änderungen, schreibt aber keine inversen Beziehungen.",
+    viewRecentLog: "Aktuelles Synchronisierungsprotokoll",
+    viewRecentLogDesc: "Zeige die letzten automatischen und Massen-Synchronisierungsschreibvorgänge.",
+    viewRecentLogButton: "Protokoll anzeigen",
+    undoLastSync: "Letzte Synchronisierung rückgängig machen",
+    undoLastSyncDesc:
+      "Macht den letzten von Relation Sync geschriebenen Änderungssatz rückgängig.",
+    undoLastSyncButton: "Rückgängig machen",
+    undoLastSyncConfirm:
+      "Dies macht den letzten von Relation Sync geschriebenen Änderungssatz rückgängig.\n\nFortfahren?",
+    undoLastSyncNotice: (count) =>
+      `RelationSync: ${count} Synchronisierungsänderungen rückgängig gemacht.`,
+    noUndoAvailable: "RelationSync: kein Änderungssatz zum Rückgängigmachen verfügbar.",
+    configInvalidTitle: "Konfiguration prüfen",
+    configInvalidDesc:
+      "Automatische Schreibvorgänge sind deaktiviert, bis leere, doppelte oder widersprüchliche aktivierte Paare behoben sind.",
+    bulkProgress: (filesDone, filesTotal, changes) =>
+      `RelationSync: ${filesDone}/${filesTotal} Dateien synchronisiert (${changes} Änderungen angewendet).`,
+    bulkSyncCancelledNotice: (changes) =>
+      `RelationSync: Massensynchronisierung nach ${changes} Änderungen abgebrochen.`,
 
     relationsPanelTitle: "Beziehungen",
     relationsPanelNoFile: "Öffnen Sie eine Notiz, um ihre Beziehungen zu sehen.",
@@ -100,6 +124,16 @@ export const de: LocaleDefinition = {
     showAllLanguages: "Alle Sprachen anzeigen",
     showAllLanguagesDesc:
       "Wenn deaktiviert, werden nur Beziehungen angezeigt, die Ihrer Sprache entsprechen. Aktivieren Sie dies, um alle zu sehen.",
+    enableVisibleCategory: "Kategorie aktivieren",
+    disableVisibleCategory: "Kategorie deaktivieren",
+    enableCurrentLanguage: "Diese Sprache aktivieren",
+    enableCurrentLanguageDesc:
+      "Aktiviere alle eingebauten Beziehungspaare für die aktuelle Obsidian-Sprache.",
+    disableOtherLanguages: "Andere Sprachen deaktivieren",
+    disableOtherLanguagesDesc:
+      "Benutzerdefinierte Paare und die aktuelle Sprache bleiben aktiv; andere Sprachpakete werden deaktiviert.",
+    duplicateImportSkipped: (added, skipped) =>
+      `RelationSync: ${added} Paare importiert; ${skipped} Duplikate übersprungen.`,
 
     catFamily: "👨‍👩‍👧‍👦 Familie",
     catRomantic: "💕 Romantisch",

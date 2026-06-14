@@ -18,7 +18,7 @@ export function validateRelationPairs(
 ): RelationValidationIssue[] {
   const issues: RelationValidationIssue[] = [];
   const pairOwners = new Map<string, number>();
-  const keyOwners = new Map<string, number>();
+  const keyTargets = new Map<string, string>();
 
   for (let index = 0; index < pairs.length; index++) {
     const pair = pairs[index];
@@ -34,13 +34,8 @@ export function validateRelationPairs(
       continue;
     }
 
-    if (forwardKey === inverseKey) {
-      issues.push({ index, message: messages.sameField });
-    }
-
     const pairKey = `${forwardKey}|${inverseKey}`;
-    const reversePairKey = `${inverseKey}|${forwardKey}`;
-    const duplicateOwner = pairOwners.get(pairKey) ?? pairOwners.get(reversePairKey);
+    const duplicateOwner = pairOwners.get(pairKey);
     if (duplicateOwner !== undefined) {
       issues.push({ index, message: messages.duplicatePair });
       continue;
@@ -48,12 +43,16 @@ export function validateRelationPairs(
       pairOwners.set(pairKey, index);
     }
 
-    for (const key of [forwardKey, inverseKey]) {
-      const owner = keyOwners.get(key);
-      if (owner !== undefined && owner !== index) {
-        issues.push({ index, message: messages.conflictingKey(key) });
+    const mappings = [
+      { key: forwardKey, target: inverseKey },
+      { key: inverseKey, target: forwardKey },
+    ];
+    for (const mapping of mappings) {
+      const existing = keyTargets.get(mapping.key);
+      if (existing && existing !== mapping.target) {
+        issues.push({ index, message: messages.conflictingKey(mapping.key) });
       } else {
-        keyOwners.set(key, index);
+        keyTargets.set(mapping.key, mapping.target);
       }
     }
   }

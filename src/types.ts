@@ -4,10 +4,12 @@
  */
 export type { RelationPair } from "./locales/types";
 
-import { getAllRelations } from "./locales";
+import { getDefaultRelations } from "./locales";
 import type { RelationPair } from "./locales/types";
 
 export interface RelationSyncSettings {
+  /** When false, file-change and rename event handlers do not write to notes. */
+  syncEnabled: boolean;
   relations: RelationPair[];
   /**
    * Comma-separated list of folder/file paths to exclude from syncing.
@@ -17,6 +19,7 @@ export interface RelationSyncSettings {
 }
 
 export const DEFAULT_SETTINGS: RelationSyncSettings = {
-  relations: getAllRelations(),
+  syncEnabled: true,
+  relations: getDefaultRelations(),
   excludePaths: "",
 };

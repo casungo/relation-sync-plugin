@@ -48,6 +48,7 @@ export interface I18nStrings {
   bulkSyncFailedNotice: string;
   bulkPreviewTitle: string;
   bulkPreviewDesc: (changes: number, files: number) => string;
+  bulkPreviewSummary: (files: number, added: number, removed: number) => string;
   bulkPreviewTruncated: (count: number) => string;
   confirmBulkSyncButton: string;
   syncLogTitle: string;
@@ -61,6 +62,21 @@ export interface I18nStrings {
   cancelButton: string;
   confirmButton: string;
   openRelationsPanel: string;
+  syncEnabled: string;
+  syncEnabledDesc: string;
+  viewRecentLog: string;
+  viewRecentLogDesc: string;
+  viewRecentLogButton: string;
+  undoLastSync: string;
+  undoLastSyncDesc: string;
+  undoLastSyncButton: string;
+  undoLastSyncConfirm: string;
+  undoLastSyncNotice: (count: number) => string;
+  noUndoAvailable: string;
+  configInvalidTitle: string;
+  configInvalidDesc: string;
+  bulkProgress: (filesDone: number, filesTotal: number, changes: number) => string;
+  bulkSyncCancelledNotice: (changes: number) => string;
 
   // ── Relations panel
   relationsPanelTitle: string;
@@ -116,6 +132,13 @@ export interface I18nStrings {
   // ── Language filter toggle
   showAllLanguages: string;
   showAllLanguagesDesc: string;
+  enableVisibleCategory: string;
+  disableVisibleCategory: string;
+  enableCurrentLanguage: string;
+  enableCurrentLanguageDesc: string;
+  disableOtherLanguages: string;
+  disableOtherLanguagesDesc: string;
+  duplicateImportSkipped: (added: number, skipped: number) => string;
 
   // ── Category labels
   catFamily: string;

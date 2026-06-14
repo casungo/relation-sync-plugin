@@ -56,6 +56,19 @@
   font-weight: 400;
 }
 
+.relation-sync-cat-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.relation-sync-cat-button {
+  height: 24px;
+  padding: 0 8px;
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+
 .relation-sync-rows {
   padding: 2px 0 2px 8px;
 }
@@ -94,6 +107,20 @@
 .relation-sync-validation {
   color: var(--text-warning);
   font-size: var(--font-ui-smaller);
+}
+
+.relation-sync-warning {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--text-warning);
+  background: var(--background-modifier-error-hover);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+.relation-sync-warning-title {
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 
 /* ── Arrow ─────────────────────────────────────────────────── */

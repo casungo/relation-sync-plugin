@@ -34,6 +34,8 @@ export const en: LocaleDefinition = {
     bulkPreviewTitle: "Bulk sync preview",
     bulkPreviewDesc: (changes, files) =>
       `Review ${changes} planned changes across ${files} notes before writing to the vault.`,
+    bulkPreviewSummary: (files, added, removed) =>
+      `${files} files will change: ${added} additions, ${removed} removals.`,
     bulkPreviewTruncated: (count) => `${count} more changes are not shown.`,
     confirmBulkSyncButton: "Apply changes",
     syncLogTitle: "Sync log",
@@ -47,6 +49,28 @@ export const en: LocaleDefinition = {
     cancelButton: "Cancel",
     confirmButton: "Confirm",
     openRelationsPanel: "Open relations panel",
+    syncEnabled: "Automatic sync",
+    syncEnabledDesc:
+      "When off, Relation Sync watches changes but does not write inverse relations.",
+    viewRecentLog: "Recent sync log",
+    viewRecentLogDesc: "Review the most recent automatic and bulk sync writes.",
+    viewRecentLogButton: "View log",
+    undoLastSync: "Undo last sync",
+    undoLastSyncDesc:
+      "Reverse the most recent Relation Sync write batch. Review the log afterward.",
+    undoLastSyncButton: "Undo last sync",
+    undoLastSyncConfirm:
+      "This reverses the most recent Relation Sync write batch.\n\nContinue?",
+    undoLastSyncNotice: (count) =>
+      `RelationSync: reversed ${count} sync changes.`,
+    noUndoAvailable: "RelationSync: no sync batch is available to undo.",
+    configInvalidTitle: "Configuration needs attention",
+    configInvalidDesc:
+      "Automatic relation writes are disabled until duplicate, empty, or conflicting enabled pairs are fixed.",
+    bulkProgress: (filesDone, filesTotal, changes) =>
+      `RelationSync: synced ${filesDone}/${filesTotal} files (${changes} changes applied).`,
+    bulkSyncCancelledNotice: (changes) =>
+      `RelationSync: bulk sync cancelled after ${changes} changes.`,
 
     relationsPanelTitle: "Relations",
     relationsPanelNoFile: "Open a note to see its relations.",
@@ -100,6 +124,16 @@ export const en: LocaleDefinition = {
     showAllLanguages: "Show all languages",
     showAllLanguagesDesc:
       "When off, only relations matching your language are shown. Turn on to see all.",
+    enableVisibleCategory: "Enable category",
+    disableVisibleCategory: "Disable category",
+    enableCurrentLanguage: "Enable this language",
+    enableCurrentLanguageDesc:
+      "Turn on all built-in relation pairs for the current Obsidian language.",
+    disableOtherLanguages: "Disable other languages",
+    disableOtherLanguagesDesc:
+      "Leave custom pairs and the current language enabled; turn other bundled language packs off.",
+    duplicateImportSkipped: (added, skipped) =>
+      `RelationSync: imported ${added} pairs; skipped ${skipped} duplicates.`,
 
     catFamily: "Family 👨‍👩‍👧‍👦",
     catRomantic: "Romantic 💕",

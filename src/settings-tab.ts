@@ -1,12 +1,13 @@
 import { type App, Modal, Notice, PluginSettingTab, Setting, TFile } from "obsidian";
 import type RelationSyncPlugin from "./main";
 import { DEFAULT_SETTINGS, type RelationPair } from "./types";
-import type { BulkSyncPlan, SyncLogEntry } from "./sync-engine";
+import type { BulkSyncPlan, BulkSyncProgress, SyncLogEntry } from "./sync-engine";
 import { validateRelationPairs } from "./validation";
 import {
   type CategoryId,
   t,
   detectLocale,
+  getDefaultRelations,
   getCategoryForKey,
   pairMatchesLocale,
 } from "./locales";
@@ -138,6 +139,10 @@ class BulkSyncPreviewModal extends Modal {
       text: strings.bulkPreviewDesc(this.plan.entries.length, this.plan.filesScanned),
       cls: "setting-item-description",
     });
+    contentEl.createEl("p", {
+      text: strings.bulkPreviewSummary(this.plan.filesToChange, this.plan.added, this.plan.removed),
+      cls: "setting-item-description",
+    });
 
     if (this.plan.entries.length > 0) {
       const table = contentEl.createEl("table", { cls: "relation-sync-log-table relation-sync-preview-table" });
@@ -183,6 +188,45 @@ class BulkSyncPreviewModal extends Modal {
   }
 }
 
+class BulkSyncRunningModal extends Modal {
+  private progressEl?: HTMLElement;
+
+  constructor(
+    app: App,
+    private readonly onCancel: () => void,
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    const strings = t();
+    this.contentEl.empty();
+    new Setting(this.contentEl).setName(strings.bulkSyncRunningNotice).setHeading();
+    this.progressEl = this.contentEl.createEl("p", {
+      text: strings.bulkProgress(0, 0, 0),
+      cls: "setting-item-description",
+    });
+    new Setting(this.contentEl).addButton((btn) =>
+      btn.setButtonText(strings.cancelButton).setWarning().onClick(() => {
+        this.onCancel();
+      }),
+    );
+  }
+
+  update(progress: BulkSyncProgress): void {
+    if (!this.progressEl) return;
+    this.progressEl.textContent = t().bulkProgress(
+      progress.filesChanged,
+      progress.totalFilesToChange,
+      progress.changesApplied,
+    );
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 // ── Settings tab ─────────────────────────────────────────────────────────
 
 export class RelationSyncSettingTab extends PluginSettingTab {
@@ -208,6 +252,48 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       .setDesc(strings.pluginDescription)
       .setHeading();
 
+    // ── Global safety controls ────────────────────────────────────────
+    new Setting(containerEl)
+      .setName(strings.syncEnabled)
+      .setDesc(strings.syncEnabledDesc)
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.syncEnabled !== false).onChange((val) => {
+          this.plugin.settings.syncEnabled = val;
+          void this.plugin.saveSettings();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(strings.viewRecentLog)
+      .setDesc(strings.viewRecentLogDesc)
+      .addButton((btn) =>
+        btn
+          .setButtonText(strings.viewRecentLogButton)
+          .onClick(() => new SyncLogModal(this.app, this.plugin.engine.getRecentLog()).open()),
+      );
+
+    new Setting(containerEl)
+      .setName(strings.undoLastSync)
+      .setDesc(strings.undoLastSyncDesc)
+      .addButton((btn) =>
+        btn
+          .setButtonText(strings.undoLastSyncButton)
+          .setWarning()
+          .onClick(() => {
+            if (!this.plugin.engine.canUndoLastSync()) {
+              new Notice(strings.noUndoAvailable);
+              return;
+            }
+            new ConfirmModal(this.app, strings.undoLastSyncConfirm, () => {
+              void (async () => {
+                const { count, log } = await this.plugin.engine.undoLastSync();
+                new Notice(strings.undoLastSyncNotice(count));
+                new SyncLogModal(this.app, log).open();
+              })();
+            }).open();
+          }),
+      );
+
     // ── Reset ─────────────────────────────────────────────────────────
     new Setting(containerEl)
       .setName(strings.resetToDefaults)
@@ -221,7 +307,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
               void (async () => {
                 this.plugin.settings = {
                   ...DEFAULT_SETTINGS,
-                  relations: DEFAULT_SETTINGS.relations.map((relation) => ({
+                  relations: getDefaultRelations(locale).map((relation) => ({
                     ...relation,
                   })),
                 };
@@ -292,6 +378,24 @@ export class RelationSyncSettingTab extends PluginSettingTab {
         toggle.setValue(this.showAllLanguages).onChange((val) => {
           this.showAllLanguages = val;
           this.renderRelations(listEl, countEl, locale);
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(strings.enableCurrentLanguage)
+      .setDesc(strings.enableCurrentLanguageDesc)
+      .addButton((btn) =>
+        btn.setButtonText(strings.enableCurrentLanguage).onClick(() => {
+          void this.setLocaleEnabled(locale, true, true);
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(strings.disableOtherLanguages)
+      .setDesc(strings.disableOtherLanguagesDesc)
+      .addButton((btn) =>
+        btn.setButtonText(strings.disableOtherLanguages).onClick(() => {
+          void this.disableOtherLocales(locale);
         }),
       );
 
@@ -368,6 +472,12 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       issuesByIndex.set(issue.index, messages);
     }
 
+    if (validationIssues.length > 0) {
+      const warningEl = container.createDiv({ cls: "relation-sync-warning" });
+      warningEl.createDiv({ text: strings.configInvalidTitle, cls: "relation-sync-warning-title" });
+      warningEl.createDiv({ text: strings.configInvalidDesc });
+    }
+
     // Group by category ID
     const grouped = new Map<
       CategoryId | "custom",
@@ -437,6 +547,27 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       summary.createSpan({
         text: ` (${items.length})`,
         cls: "relation-sync-cat-count",
+      });
+      const actionEl = summary.createSpan({ cls: "relation-sync-cat-actions" });
+      const enableButton = actionEl.createEl("button", {
+        text: strings.enableVisibleCategory,
+        cls: "clickable-icon relation-sync-cat-button",
+      });
+      enableButton.type = "button";
+      enableButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.setCategoryEnabled(items.map((item) => item.index), true);
+      });
+      const disableButton = actionEl.createEl("button", {
+        text: strings.disableVisibleCategory,
+        cls: "clickable-icon relation-sync-cat-button",
+      });
+      disableButton.type = "button";
+      disableButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.setCategoryEnabled(items.map((item) => item.index), false);
       });
 
       const rowsEl = details.createDiv({ cls: "relation-sync-rows" });
@@ -531,11 +662,44 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     const plan = this.plugin.engine.previewBulkSync();
     new BulkSyncPreviewModal(this.app, plan, () => {
       void (async () => {
-        const { count, log } = await this.plugin.engine.runBulkSync();
-        new Notice(strings.syncNotice(count));
+        const running = new BulkSyncRunningModal(this.app, () => this.plugin.engine.cancelBulkSync());
+        running.open();
+        const { count, log, cancelled } = await this.plugin.engine.runBulkSync((progress) => {
+          running.update(progress);
+        });
+        running.close();
+        new Notice(cancelled ? strings.bulkSyncCancelledNotice(log.length) : strings.syncNotice(count));
         new SyncLogModal(this.app, log).open();
       })();
     }).open();
+  }
+
+  private async setCategoryEnabled(indexes: number[], enabled: boolean): Promise<void> {
+    for (const index of indexes) {
+      const pair = this.plugin.settings.relations[index];
+      if (pair) pair.enabled = enabled;
+    }
+    await this.plugin.saveSettings();
+    this.display();
+  }
+
+  private async setLocaleEnabled(locale: string, enabled: boolean, keepOthers: boolean): Promise<void> {
+    for (const pair of this.plugin.settings.relations) {
+      const matches = pairMatchesLocale(pair, locale) && getCategoryForKey(pair.forward) !== "custom";
+      if (matches) pair.enabled = enabled;
+      else if (!keepOthers) pair.enabled = false;
+    }
+    await this.plugin.saveSettings();
+    this.display();
+  }
+
+  private async disableOtherLocales(locale: string): Promise<void> {
+    for (const pair of this.plugin.settings.relations) {
+      const isCustom = getCategoryForKey(pair.forward) === "custom";
+      if (!isCustom && !pairMatchesLocale(pair, locale)) pair.enabled = false;
+    }
+    await this.plugin.saveSettings();
+    this.display();
   }
 
   // ── Export pairs ──────────────────────────────────────────────────────
@@ -592,16 +756,19 @@ export class RelationSyncSettingTab extends PluginSettingTab {
             ),
           );
           let added = 0;
+          let skipped = 0;
           for (const pair of pairs) {
             const key = `${pair.forward.toLowerCase()}|${pair.inverse.toLowerCase()}`;
             if (!existing.has(key)) {
               this.plugin.settings.relations.push(pair);
               existing.add(key);
               added++;
+            } else {
+              skipped++;
             }
           }
           await this.plugin.saveSettings();
-          new Notice(strings.importSuccess(added));
+          new Notice(skipped > 0 ? strings.duplicateImportSkipped(added, skipped) : strings.importSuccess(added));
           this.display();
         } catch {
           new Notice(strings.importError);

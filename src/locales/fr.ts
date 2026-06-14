@@ -32,6 +32,8 @@ export const fr: LocaleDefinition = {
     bulkPreviewTitle: "Aperçu de la synchronisation massive",
     bulkPreviewDesc: (changes, files) =>
       `Vérifiez ${changes} changements prévus dans ${files} notes avant d'écrire dans le coffre.`,
+    bulkPreviewSummary: (files, added, removed) =>
+      `${files} fichiers seront modifiés : ${added} ajouts, ${removed} suppressions.`,
     bulkPreviewTruncated: (count) => `${count} changements supplémentaires ne sont pas affichés.`,
     confirmBulkSyncButton: "Appliquer les changements",
     syncLogTitle: "Journal de synchronisation",
@@ -45,6 +47,28 @@ export const fr: LocaleDefinition = {
     cancelButton: "Annuler",
     confirmButton: "Confirmer",
     openRelationsPanel: "Ouvrir le panneau des relations",
+    syncEnabled: "Synchronisation automatique",
+    syncEnabledDesc:
+      "Quand elle est désactivée, Relation Sync observe les changements mais n'écrit pas de relations inverses.",
+    viewRecentLog: "Journal de synchronisation récent",
+    viewRecentLogDesc: "Consulte les écritures récentes de synchronisation automatique et massive.",
+    viewRecentLogButton: "Voir le journal",
+    undoLastSync: "Annuler la dernière synchronisation",
+    undoLastSyncDesc:
+      "Inverse le dernier lot d'écritures de Relation Sync. Consulte le journal ensuite.",
+    undoLastSyncButton: "Annuler la dernière synchronisation",
+    undoLastSyncConfirm:
+      "Ceci inverse le dernier lot d'écritures de Relation Sync.\n\nContinuer ?",
+    undoLastSyncNotice: (count) =>
+      `RelationSync : ${count} changements de synchronisation annulés.`,
+    noUndoAvailable: "RelationSync : aucun lot de synchronisation à annuler.",
+    configInvalidTitle: "La configuration nécessite une attention",
+    configInvalidDesc:
+      "Les écritures automatiques sont désactivées jusqu'à correction des paires activées vides, dupliquées ou conflictuelles.",
+    bulkProgress: (filesDone, filesTotal, changes) =>
+      `RelationSync : ${filesDone}/${filesTotal} fichiers synchronisés (${changes} changements appliqués).`,
+    bulkSyncCancelledNotice: (changes) =>
+      `RelationSync : synchronisation massive annulée après ${changes} changements.`,
 
     relationsPanelTitle: "Relations",
     relationsPanelNoFile: "Ouvrez une note pour voir ses relations.",
@@ -100,6 +124,16 @@ export const fr: LocaleDefinition = {
     showAllLanguages: "Afficher toutes les langues",
     showAllLanguagesDesc:
       "Lorsqu'il est désactivé, seules les relations correspondant à votre langue sont affichées. Activez-le pour tout voir.",
+    enableVisibleCategory: "Activer la catégorie",
+    disableVisibleCategory: "Désactiver la catégorie",
+    enableCurrentLanguage: "Activer cette langue",
+    enableCurrentLanguageDesc:
+      "Active toutes les paires intégrées pour la langue actuelle d'Obsidian.",
+    disableOtherLanguages: "Désactiver les autres langues",
+    disableOtherLanguagesDesc:
+      "Garde les paires personnalisées et la langue actuelle activées ; désactive les autres packs.",
+    duplicateImportSkipped: (added, skipped) =>
+      `RelationSync : ${added} paires importées ; ${skipped} doublons ignorés.`,
 
     catFamily: "👨‍👩‍👧‍👦 Famille",
     catRomantic: "💕 Romantique",
