@@ -6,7 +6,7 @@ import { t } from "./locales";
 import { RelationPanelView, RELATION_PANEL_VIEW_TYPE } from "./relation-panel";
 
 export default class RelationSyncPlugin extends Plugin {
-  settings!: RelationSyncSettings;
+  declare settings: RelationSyncSettings;
   engine!: SyncEngine;
 
   async onload(): Promise<void> {
