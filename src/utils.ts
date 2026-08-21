@@ -18,6 +18,16 @@ export function parseWikiLinks(value: unknown): string[] {
   return result;
 }
 
+/** Match a frontmatter cache key to a relation field or one of its array items. */
+export function matchesFrontmatterRelationKey(linkKey: string, relationKey: string): boolean {
+  const normalizedLinkKey = linkKey.toLowerCase();
+  const normalizedRelationKey = relationKey.toLowerCase();
+  if (normalizedLinkKey === normalizedRelationKey) return true;
+
+  const arrayIndex = normalizedLinkKey.slice(normalizedRelationKey.length + 1);
+  return normalizedLinkKey.startsWith(normalizedRelationKey + ".") && /^\d+$/.test(arrayIndex);
+}
+
 /** Case-insensitive link comparison. */
 export function linksEqual(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
@@ -50,6 +60,7 @@ export function replaceWikiLinkTarget(
   value: string,
   oldPath: string,
   newPath: string,
+  shouldReplaceTarget?: (target: string) => boolean,
 ): string {
   const oldTarget = normalizeLinkTarget(oldPath);
   const oldBase = oldTarget.split("/").pop() ?? oldTarget;
@@ -59,13 +70,13 @@ export function replaceWikiLinkTarget(
   return value.replace(/\[\[([^\]|#]+)((?:#[^\]|]+)?(?:\|[^\]]+)?)]]/g, (match, rawTarget: string, suffix: string) => {
     const target = normalizeLinkTarget(rawTarget);
     const targetBase = target.split("/").pop() ?? target;
-    if (linksEqual(target, oldTarget)) {
-      return `[[${newTarget}${suffix}]]`;
-    }
-    if (!target.includes("/") && linksEqual(targetBase, oldBase)) {
-      return `[[${newBase}${suffix}]]`;
-    }
-    return match;
+    const matches = shouldReplaceTarget
+      ? shouldReplaceTarget(rawTarget)
+      : linksEqual(target, oldTarget) || (!target.includes("/") && linksEqual(targetBase, oldBase));
+    if (!matches) return match;
+
+    const replacement = linksEqual(target, oldTarget) ? newTarget : newBase;
+    return `[[${replacement}${suffix}]]`;
   });
 }
 

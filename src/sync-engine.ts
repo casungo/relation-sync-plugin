@@ -12,6 +12,7 @@ import { isExcludedPath } from "./path-rules";
 import {
   debounce,
   linkTargetsEqual,
+  matchesFrontmatterRelationKey,
   parseWikiLinks,
   matchCasing,
   replaceWikiLinkTarget,
@@ -162,6 +163,8 @@ export class SyncEngine {
     this.prevFm.delete(oldPath);
     if (snap) this.prevFm.set(file.path, snap);
 
+    if (this.isExcluded(file.path)) return;
+
     const oldLinkPath = oldPath.replace(/\.md$/i, "");
     const newLinkPath = file.path.replace(/\.md$/i, "");
     const oldBasename = oldLinkPath.split("/").pop() ?? oldLinkPath;
@@ -172,13 +175,16 @@ export class SyncEngine {
       const cache = this.app.metadataCache.getFileCache(f);
       if (!cache?.frontmatter) continue;
 
-      // Check if any frontmatter value references the old link
       const fm = cache.frontmatter;
-      const hasRef = Object.values(fm).some((v) => {
-        if (typeof v === "string") return v.includes("[[") && v.includes(oldBasename);
-        if (Array.isArray(v)) return v.some((item) => typeof item === "string" && item.includes("[[") && item.includes(oldBasename));
-        return false;
-      });
+      const shouldReplaceTarget = (targetName: string): boolean => {
+        if (linkTargetsEqual(targetName, oldLinkPath)) return true;
+        if (targetName.includes("/") || !linkTargetsEqual(targetName, oldBasename)) return false;
+        const resolved = this.app.metadataCache.getFirstLinkpathDest(targetName, f.path);
+        return !(resolved instanceof TFile) || resolved.path === file.path;
+      };
+      const hasRef = Object.values(fm).some((value) =>
+        parseWikiLinks(value).some(shouldReplaceTarget),
+      );
       if (!hasRef) continue;
 
       this.writing.add(f.path);
@@ -188,10 +194,10 @@ export class SyncEngine {
           for (const key of Object.keys(fmObj)) {
             const val = fmObj[key];
             if (typeof val === "string") {
-              fmObj[key] = replaceWikiLinkTarget(val, oldLinkPath, newLinkPath);
+              fmObj[key] = replaceWikiLinkTarget(val, oldLinkPath, newLinkPath, shouldReplaceTarget);
             } else if (Array.isArray(val)) {
               fmObj[key] = val.map((item) =>
-                typeof item === "string" ? replaceWikiLinkTarget(item, oldLinkPath, newLinkPath) : item
+                typeof item === "string" ? replaceWikiLinkTarget(item, oldLinkPath, newLinkPath, shouldReplaceTarget) : item
               );
             }
           }
@@ -447,7 +453,7 @@ export class SyncEngine {
     return fmLinks
       .filter((l) => {
         const k = l.key?.toLowerCase() ?? "";
-        return k === key || k.startsWith(key + ".");
+        return matchesFrontmatterRelationKey(k, key);
       })
       .map((l) => l.link);
   }
