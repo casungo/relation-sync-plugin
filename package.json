@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-relation-sync",
-	"version": "1.1.6",
+	"version": "1.2.0",
 	"description": "Automatically syncs inverse frontmatter relations. Define relation pairs like parent-child or spouse to keep both sides in sync.",
 	"main": "main.js",
 	"type": "module",
@@ -9,7 +9,6 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"test": "vitest run",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"postversion": "git push && git push origin --tags",
 		"lint": "eslint ."
 	},
 	"keywords": [
@@ -39,7 +38,7 @@
 	"funding": "https://casungo.top/donate",
 	"devDependencies": {
 		"@eslint/js": "9.30.1",
-		"@types/node": "^16.11.6",
+		"@types/node": "22.20.1",
 		"esbuild": "0.25.5",
 		"eslint-plugin-obsidianmd": "0.1.9",
 		"globals": "14.0.0",
@@ -47,7 +46,7 @@
 		"tslib": "2.4.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "8.35.1",
-		"vitest": "^0.34.6"
+		"vitest": "4.1.11"
 	},
 	"dependencies": {
 		"obsidian": "latest"
