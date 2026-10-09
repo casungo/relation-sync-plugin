@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildRelationMap } from "./relation-map";
 import { validateRelationPairs } from "./validation";
-import { getDefaultRelations } from "./locales";
+import { LEGACY_RELATIONS } from "./legacy-relations";
+import { getDefaultRelations, getLocaleCodes } from "./locales";
 
 const messages = {
   emptyField: "empty",
-  sameField: "same",
+
   duplicatePair: "duplicate",
   conflictingKey: (key: string) => `conflict:${key}`,
 };
@@ -57,8 +58,8 @@ describe("validateRelationPairs", () => {
 
   it("enables only the selected locale in the default relation set", () => {
     const defaults = getDefaultRelations("en");
-    const english = defaults.find((pair) => pair.forward === "Parent of");
-    const italian = defaults.find((pair) => pair.forward === "Genitore di");
+    const english = defaults.find((pair) => pair.forward === "parent");
+    const italian = defaults.find((pair) => pair.forward === "genitore");
 
     expect(english?.enabled).toBe(true);
     expect(italian?.enabled).toBe(false);
@@ -67,7 +68,50 @@ describe("validateRelationPairs", () => {
   it("plans sync mappings only for enabled default language pairs", () => {
     const map = buildRelationMap(getDefaultRelations("en"));
 
-    expect(map.get("parent of")).toBe("Child of");
-    expect(map.has("genitore di")).toBe(false);
+    expect(map.get("mother")).toBe("child");
+    expect(map.has("madre")).toBe(false);
   });
+});
+
+
+describe("English and Italian presets", () => {
+  it("ships only English and Italian with conflict-free defaults enabled together", () => {
+    expect(getLocaleCodes()).toEqual(["en", "it"]);
+    const defaults = getDefaultRelations();
+    expect(defaults.every((pair) => pair.enabled)).toBe(true);
+    expect(validateRelationPairs(defaults, messages)).toEqual([]);
+    const map = buildRelationMap(defaults);
+    expect(map.get("mamma")).toBe("figli");
+    expect(map.get("papà")).toBe("figli");
+    expect(map.get("daughter")).toBe("parent");
+    expect(map.get("figlia")).toBe("genitore");
+  });
+
+  it("validates aliases on both sides, including collisions with a canonical name", () => {
+    expect(validateRelationPairs([
+      { forward: "parent", inverse: "child", forwardAliases: ["mother"] },
+      { forward: "mother", inverse: "daughter" },
+    ], messages)).toEqual([{ index: 1, message: "conflict:mother" }]);
+    expect(validateRelationPairs([
+      { forward: "parent", inverse: "child", inverseAliases: ["parent"] },
+    ], messages).map((issue) => issue.message)).toEqual(["conflict:parent"]);
+  });
+
+  it("retains the meaning of legacy source-role phrases", () => {
+    const map = buildRelationMap(getDefaultRelations());
+    expect(map.get("figlio di")).toBe("figli");
+    expect(map.get("madre di")).toBe("genitore");
+    expect(map.get("child of")).toBe("child");
+    expect(map.get("mother of")).toBe("parent");
+  });
+});
+
+
+it("recognizes every legacy English and Italian property through the new catalog", () => {
+  const map = buildRelationMap(getDefaultRelations());
+  for (const code of ["en", "it"]) {
+    for (const pair of LEGACY_RELATIONS[code]!) {
+      for (const key of pair.split("|")) expect(map.has(key), key).toBe(true);
+    }
+  }
 });

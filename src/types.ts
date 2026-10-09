@@ -8,6 +8,7 @@ import { getDefaultRelations } from "./locales";
 import type { RelationPair } from "./locales/types";
 
 export interface RelationSyncSettings {
+  schemaVersion?: number;
   /** When false, file-change and rename event handlers do not write to notes. */
   syncEnabled: boolean;
   relations: RelationPair[];
@@ -19,7 +20,8 @@ export interface RelationSyncSettings {
 }
 
 export const DEFAULT_SETTINGS: RelationSyncSettings = {
-  syncEnabled: true,
+  schemaVersion: 2,
+  syncEnabled: false,
   relations: getDefaultRelations(),
   excludePaths: "",
 };

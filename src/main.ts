@@ -1,8 +1,9 @@
-import { type App, Modal, Notice, Plugin, Setting, TFile } from "obsidian";
-import { type RelationSyncSettings, DEFAULT_SETTINGS } from "./types";
+import { Notice, Plugin, TFile } from "obsidian";
+import { type RelationSyncSettings } from "./types";
 import { SyncEngine } from "./sync-engine";
-import { RelationSyncSettingTab } from "./settings-tab";
+import { RelationSyncSettingTab, showSyncPreview } from "./settings-tab";
 import { t } from "./locales";
+import { loadRelationSettings } from "./settings";
 import { RelationPanelView, RELATION_PANEL_VIEW_TYPE } from "./relation-panel";
 
 export default class RelationSyncPlugin extends Plugin {
@@ -51,15 +52,15 @@ export default class RelationSyncPlugin extends Plugin {
     // ── Command palette ────────────────────────────────────────────────
     this.addCommand({
       id: "run-bulk-sync",
-      name: "Run bulk sync",
+      name: t().syncVault,
       callback: () => {
-        void this.runBulkSyncCommand();
+        showSyncPreview(this.app, this.engine);
       },
     });
 
     this.addCommand({
       id: "cancel-bulk-sync",
-      name: "Cancel bulk sync",
+      name: t().cancelButton,
       callback: () => {
         this.engine.cancelBulkSync();
       },
@@ -67,12 +68,19 @@ export default class RelationSyncPlugin extends Plugin {
 
     this.addCommand({
       id: "open-settings",
-      name: "Open settings",
+      name: t().openSettings,
       callback: () => {
-        // Navigate to this settings pane.
-        const appWithSetting = this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } };
-        appWithSetting.setting?.open();
-        appWithSetting.setting?.openTabById(this.manifest.id);
+        this.openSettings();
+      },
+    });
+
+    this.addCommand({
+      id: "preview-current-note",
+      name: t().checkCurrentNote,
+      callback: () => {
+        const file = this.app.workspace.getActiveFile();
+        if (file instanceof TFile && file.extension === "md") showSyncPreview(this.app, this.engine, file);
+        else new Notice(t().noActiveNote);
       },
     });
 
@@ -96,16 +104,26 @@ export default class RelationSyncPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign(
-      {},
-      DEFAULT_SETTINGS,
-      (await this.loadData()) as Partial<RelationSyncSettings> | null,
-    );
+    const { settings, migrated } = loadRelationSettings(await this.loadData());
+    this.settings = settings;
+    if (migrated) {
+      await this.saveData(settings);
+      new Notice(t().settingsMigrated, 12000);
+    }
+  }
+
+  openSettings(): void {
+    const appWithSetting = this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } };
+    appWithSetting.setting?.open();
+    appWithSetting.setting?.openTabById(this.manifest.id);
   }
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
     this.engine.refreshMap(this.settings);
+    for (const leaf of this.app.workspace.getLeavesOfType(RELATION_PANEL_VIEW_TYPE)) {
+      if (leaf.view instanceof RelationPanelView) leaf.view.render();
+    }
   }
 
   private async activateRelationPanel(): Promise<void> {
@@ -125,55 +143,4 @@ export default class RelationSyncPlugin extends Plugin {
     this.app.workspace.revealLeaf(leaf);
   }
 
-  private async runBulkSyncCommand(): Promise<void> {
-    const strings = t();
-    const plan = this.engine.previewBulkSync();
-    new BulkSyncCommandModal(this.app, plan.entries.length, plan.filesScanned, async () => {
-      const notice = new Notice(strings.bulkSyncRunningNotice, 0);
-      try {
-        const { count, log, cancelled } = await this.engine.runBulkSync();
-        notice.hide();
-        new Notice(cancelled ? strings.bulkSyncCancelledNotice(log.length) : strings.syncNotice(count));
-      } catch {
-        notice.hide();
-        new Notice(strings.bulkSyncFailedNotice);
-      }
-    }).open();
-  }
-}
-
-class BulkSyncCommandModal extends Modal {
-  constructor(
-    app: App,
-    private readonly changes: number,
-    private readonly files: number,
-    private readonly onConfirm: () => Promise<void>,
-  ) {
-    super(app);
-  }
-
-  onOpen(): void {
-    const strings = t();
-    this.contentEl.empty();
-    new Setting(this.contentEl).setName(strings.bulkPreviewTitle).setHeading();
-    this.contentEl.createEl("p", {
-      text: strings.bulkPreviewDesc(this.changes, this.files),
-      cls: "setting-item-description",
-    });
-    new Setting(this.contentEl)
-      .addButton((btn) => btn.setButtonText(strings.cancelButton).onClick(() => this.close()))
-      .addButton((btn) =>
-        btn
-          .setButtonText(strings.confirmBulkSyncButton)
-          .setWarning()
-          .onClick(() => {
-            void this.onConfirm();
-            this.close();
-          }),
-      );
-  }
-
-  onClose(): void {
-    this.contentEl.empty();
-  }
 }

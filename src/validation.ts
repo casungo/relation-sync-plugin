@@ -1,4 +1,15 @@
 import type { RelationPair } from "./types";
+import { relationKeys } from "./relation-map";
+
+export function isRelationPair(value: unknown): value is RelationPair {
+  if (!value || typeof value !== "object") return false;
+  const pair = value as RelationPair;
+  return typeof pair.forward === "string" && typeof pair.inverse === "string" &&
+    (pair.enabled === undefined || typeof pair.enabled === "boolean") &&
+    [pair.forwardAliases, pair.inverseAliases].every((aliases) =>
+      aliases === undefined || (Array.isArray(aliases) && aliases.every((key) => typeof key === "string" && key.trim().length > 0)),
+    );
+}
 
 export interface RelationValidationIssue {
   index: number;
@@ -7,7 +18,7 @@ export interface RelationValidationIssue {
 
 export interface RelationValidationMessages {
   emptyField: string;
-  sameField: string;
+
   duplicatePair: string;
   conflictingKey: (key: string) => string;
 }
@@ -44,8 +55,8 @@ export function validateRelationPairs(
     }
 
     const mappings = [
-      { key: forwardKey, target: inverseKey },
-      { key: inverseKey, target: forwardKey },
+      ...relationKeys(pair, "forward").map((key) => ({ key: key.toLowerCase(), target: inverseKey })),
+      ...relationKeys(pair, "inverse").map((key) => ({ key: key.toLowerCase(), target: forwardKey })),
     ];
     for (const mapping of mappings) {
       const existing = keyTargets.get(mapping.key);

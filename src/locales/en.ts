@@ -6,29 +6,80 @@ import type { LocaleDefinition } from "./types";
  * Contains all UI strings and the default relation pairs for English.
  */
 export const en: LocaleDefinition = {
-  code: "EN",
+  code: "en",
 
   // ── UI strings ─────────────────────────────────────────────────────────
   strings: {
+    stateReady: "Automatic sync is active",
+    statePaused: "Automatic sync is paused",
+    stateBlocked: "Sync is blocked: review enabled pairs",
+    firstRunTitle: "Start with two notes",
+    firstRunDesc: "The property names describe the person you link to. Create both notes, add a quoted wiki link to a property, then preview the current note before enabling automatic sync.",
+    exampleSource: "Alex.md",
+    exampleTarget: "Morgan.md",
+    exampleForward: "mother",
+    exampleInverse: "child",
+    checkCurrentNote: "Preview current note",
+    checkCurrentNoteDesc: "Add missing inverse links for this note. The preview also lists missing and excluded targets. This manual action works while automatic sync is paused.",
+    noActiveNote: "Open a Markdown note first.",
+    openSettings: "Open settings",
+    relationsHeading: "Relation pairs",
+    advancedHeading: "Vault tools and presets",
+    editPair: "Edit pair",
+    savePair: "Save pair",
+    pairEnabled: "Enable this pair",
+    forwardLabel: "Property on the source note",
+    inverseLabel: "Property to add on the linked note",
+    forwardAliasesLabel: "Other names for the source property",
+    inverseAliasesLabel: "Other names for the inverse property",
+    aliasesDesc: "Comma-separated synonyms. An inverse is written under the main name; existing synonyms are preserved.",
+    aliasesPlaceholder: "mother, mom, mum, father, dad",
+    activePairs: (active, total) => `${active} active / ${total} pairs`,
+    logAdded: "Added",
+    logRemoved: "Removed",
+    syncBusy: "A sync is already running. Wait for it to finish.",
+    previewChanged: "The notes or configuration changed after the preview. Preview again before applying.",
+    writeError: (file, message) => `Relation Sync: could not update ${file}: ${message}`,
+    syncResult: (scanned, changed, changes, failed) => `Read ${scanned} notes; changed ${changed} notes; applied ${changes} changes; ${failed} write errors.`,
+    problemsHeading: "Links that cannot be synchronized",
+    problemMissing: "Target note does not exist",
+    problemExcluded: "Target note is excluded",
+    problemValue: "The inverse property has an unsupported value; change it to a wiki link or a list.",
+    problemInvalid: "Target is not a Markdown note",
+    undoSessionDesc: "Undo covers only the latest write batch in this plugin session. Later sync writes replace it; restarting Obsidian clears it. Renaming notes is outside this undo.",
+    settingsMigrated: "Relation Sync now uses English and Italian presets with neutral inverses. Custom pairs, automatic sync and exclusions were preserved. Review the updated pairs before syncing.",
+    languageFilter: "Property language",
+    allLanguages: "English and Italian",
+    languagePresets: "Enable a preset",
+    languagePresetsDesc: "Add compatible pairs without overriding custom mappings. Property language is independent of the interface language.",
+    enableEnglish: "Enable English pairs",
+    enableItalian: "Enable Italian pairs",
+    presetConflicts: (count) => `${count} incompatible pairs were left disabled. Review their property names.`,
+    panelCheck: "Preview inverse links",
+    panelConfigured: "Configure relation pairs",
+    panelMissing: "Missing note",
+    panelExcluded: "Excluded note",
+    panelReciprocal: "Inverse found",
+    panelUnpaired: "Inverse missing",
+    undoPreviewTitle: "Changes to undo",
+    undoChanges: (count) => `Undo ${count} recorded changes. Review the list before continuing.`,
+
     pluginTitle: "Relation sync",
     pluginDescription:
-      'Define inverse relation pairs. When you write "forward: [[Target]]" ' +
-      "in a note's frontmatter, the plugin automatically adds " +
-      '"inverse: [[Source]]" in the target\'s frontmatter.',
+      "Maintain inverse links between note properties. English and Italian synonyms share neutral roles; no gender is inferred.",
 
-    resetToDefaults: "Reset to defaults",
+    resetToDefaults: "Reset relation pairs",
     resetToDefaultsDesc:
-      "Delete all custom changes and restore the built-in relation set.",
-    resetToDefaultsButton: "Reset to defaults",
+      "Replace relation pairs only. Automatic sync and excluded paths stay unchanged.",
+    resetToDefaultsButton: "Reset relation pairs",
     resetConfirm:
-      "This will replace all your current relations with the built-in defaults.\n\nContinue?",
+      "Replace all relation pairs, including custom pairs? Automatic sync and excluded paths will stay unchanged. No note properties will be removed.",
     resetNotice: "RelationSync: relations reset to defaults.",
 
     syncVault: "Sync entire vault",
     syncVaultDesc:
-      "Re-compute and add all inverse relations across every file in the vault.",
+      "Preview and add missing inverse links. Existing relations are preserved; this manual action also works while automatic sync is paused.",
     syncVaultButton: "Run global sync",
-    syncNotice: (count) => `RelationSync: sync completed on ${count} notes.`,
     bulkSyncRunningNotice: "RelationSync: bulk sync running...",
     bulkSyncFailedNotice: "RelationSync: bulk sync failed.",
     bulkPreviewTitle: "Bulk sync preview",
@@ -53,20 +104,16 @@ export const en: LocaleDefinition = {
     syncEnabledDesc:
       "When off, Relation Sync watches changes but does not write inverse relations.",
     viewRecentLog: "Recent sync log",
-    viewRecentLogDesc: "Review the most recent automatic and bulk sync writes.",
+    viewRecentLogDesc: "Review up to 200 recent writes from this plugin session, including full note paths.",
     viewRecentLogButton: "View log",
     undoLastSync: "Undo last sync",
-    undoLastSyncDesc:
-      "Reverse the most recent Relation Sync write batch. Review the log afterward.",
     undoLastSyncButton: "Undo last sync",
-    undoLastSyncConfirm:
-      "This reverses the most recent Relation Sync write batch.\n\nContinue?",
     undoLastSyncNotice: (count) =>
       `RelationSync: reversed ${count} sync changes.`,
     noUndoAvailable: "RelationSync: no sync batch is available to undo.",
     configInvalidTitle: "Configuration needs attention",
     configInvalidDesc:
-      "Automatic relation writes are disabled until duplicate, empty, or conflicting enabled pairs are fixed.",
+      "Fix empty or conflicting enabled property names and aliases before syncing. Enable at least one valid pair.",
     bulkProgress: (filesDone, filesTotal, changes) =>
       `RelationSync: synced ${filesDone}/${filesTotal} files (${changes} changes applied).`,
     bulkSyncCancelledNotice: (changes) =>
@@ -105,15 +152,11 @@ export const en: LocaleDefinition = {
 
     addPairButton: "Add pair",
 
-    pairsTotal: (count) => `${count} pairs total`,
-    pairsShown: (visible, total) => `${visible} / ${total} pairs shown`,
-
-    forwardPlaceholder: "Forward (e.g., friend of)",
-    inversePlaceholder: "Inverse (e.g., friend of)",
+    forwardPlaceholder: "parent",
+    inversePlaceholder: "child",
     removePairTooltip: "Remove this pair",
     togglePairTooltip: "Enable/disable this pair",
     validationEmptyField: "Both relation fields are required.",
-    validationSameField: "Forward and inverse cannot be the same.",
     validationDuplicatePair: "This relation pair is duplicated.",
     validationConflictingKey: (key) =>
       `"${key}" is already managed by another enabled pair.`,
@@ -121,194 +164,309 @@ export const en: LocaleDefinition = {
     noSearchResults: "No relations match your search.",
     noRelations: 'No relations defined. Click "add pair" to create one.',
 
-    showAllLanguages: "Show all languages",
-    showAllLanguagesDesc:
-      "When off, only relations matching your language are shown. Turn on to see all.",
-    enableVisibleCategory: "Enable category",
-    disableVisibleCategory: "Disable category",
-    enableCurrentLanguage: "Enable this language",
-    enableCurrentLanguageDesc:
-      "Turn on all built-in relation pairs for the current Obsidian language.",
-    disableOtherLanguages: "Disable other languages",
-    disableOtherLanguagesDesc:
-      "Leave custom pairs and the current language enabled; turn other bundled language packs off.",
     duplicateImportSkipped: (added, skipped) =>
       `RelationSync: imported ${added} pairs; skipped ${skipped} duplicates.`,
 
-    catFamily: "Family 👨‍👩‍👧‍👦",
-    catRomantic: "Romantic 💕",
-    catFriendship: "Friendship & social 🤝",
-    catProfessional: "Professional 💼",
-    catEducation: "Education 🎓",
-    catCreative: "Creative 🎨",
-    catMisc: "Miscellaneous 🔗",
-    catCustom: "Custom 📦",
+    catFamily: "Family",
+    catRomantic: "Romantic",
+    catFriendship: "Friendship & social",
+    catProfessional: "Professional",
+    catEducation: "Education",
+    catCreative: "Creative",
+    catMisc: "Miscellaneous",
+    catCustom: "Custom",
   },
 
-  // ── Relation pairs by category ─────────────────────────────────────────
   categories: {
     family: [
-      // Parent / Child
-      { forward: "Child of",         inverse: "Parent of" },
-      { forward: "Parent of",        inverse: "Child of" },
-      { forward: "Son of",           inverse: "Father of" },
-      { forward: "Father of",        inverse: "Son of" },
-      { forward: "Daughter of",      inverse: "Mother of" },
-      { forward: "Mother of",        inverse: "Daughter of" },
-      { forward: "Stepchild of",     inverse: "Stepparent of" },
-      { forward: "Stepparent of",    inverse: "Stepchild of" },
-      { forward: "Stepfather of",    inverse: "Stepchild of" },
-      { forward: "Stepmother of",    inverse: "Stepchild of" },
-      { forward: "Stepson of",       inverse: "Stepparent of" },
-      { forward: "Stepdaughter of",  inverse: "Stepparent of" },
-      { forward: "Adopted child of", inverse: "Adoptive parent of" },
-      { forward: "Adoptive parent of", inverse: "Adopted child of" },
-      { forward: "Foster child of",  inverse: "Foster parent of" },
-      { forward: "Foster parent of", inverse: "Foster child of" },
-      // Spouses & Partners
-      { forward: "Wife of",          inverse: "Husband of" },
-      { forward: "Husband of",       inverse: "Wife of" },
-      { forward: "Spouse of",        inverse: "Spouse of" },
-      { forward: "Partner of",       inverse: "Partner of" },
-      { forward: "Life partner of",  inverse: "Life partner of" },
-      // Siblings
-      { forward: "Brother of",       inverse: "Brother of" },
-      { forward: "Sister of",        inverse: "Sister of" },
-      { forward: "Sibling of",       inverse: "Sibling of" },
-      { forward: "Twin of",          inverse: "Twin of" },
-      { forward: "Half-brother of",  inverse: "Half-brother of" },
-      { forward: "Half-sister of",   inverse: "Half-sister of" },
-      { forward: "Stepbrother of",   inverse: "Stepbrother of" },
-      { forward: "Stepsister of",    inverse: "Stepsister of" },
-      // Grandparents / Grandchildren
-      { forward: "Grandchild of",    inverse: "Grandparent of" },
-      { forward: "Grandparent of",   inverse: "Grandchild of" },
-      { forward: "Grandson of",      inverse: "Grandfather of" },
-      { forward: "Grandfather of",   inverse: "Grandson of" },
-      { forward: "Granddaughter of", inverse: "Grandmother of" },
-      { forward: "Grandmother of",   inverse: "Granddaughter of" },
-      { forward: "Great-grandchild of",  inverse: "Great-grandparent of" },
-      { forward: "Great-grandparent of", inverse: "Great-grandchild of" },
-      // Uncles / Aunts / Nephews / Nieces
-      { forward: "Uncle of",         inverse: "Nephew of" },
-      { forward: "Aunt of",          inverse: "Niece of" },
-      { forward: "Nephew of",        inverse: "Uncle of" },
-      { forward: "Niece of",         inverse: "Aunt of" },
-      // Cousins
-      { forward: "Cousin of",        inverse: "Cousin of" },
-      // In-laws
-      { forward: "Father-in-law of", inverse: "Son-in-law of" },
-      { forward: "Mother-in-law of", inverse: "Daughter-in-law of" },
-      { forward: "Son-in-law of",    inverse: "Father-in-law of" },
-      { forward: "Daughter-in-law of", inverse: "Mother-in-law of" },
-      { forward: "Brother-in-law of", inverse: "Brother-in-law of" },
-      { forward: "Sister-in-law of", inverse: "Sister-in-law of" },
-      // Godparents
-      { forward: "Godfather of",     inverse: "Godchild of" },
-      { forward: "Godmother of",     inverse: "Godchild of" },
-      { forward: "Godchild of",      inverse: "Godparent of" },
-      { forward: "Godparent of",     inverse: "Godchild of" },
+      {
+        forward: "parent", inverse: "child",
+        forwardAliases: ["parents", "mother", "mom", "mum", "mama", "father", "dad", "Child of", "Son of", "Daughter of"],
+        inverseAliases: ["children", "son", "sons", "daughter", "daughters", "Parent of", "Father of", "Mother of"],
+      },
+      {
+        forward: "stepparent", inverse: "stepchild",
+        forwardAliases: ["stepmother", "stepfather", "Stepchild of", "Stepson of", "Stepdaughter of"],
+        inverseAliases: ["stepchildren", "stepson", "stepdaughter", "Stepparent of", "Stepfather of", "Stepmother of"],
+      },
+      {
+        forward: "adoptive parent", inverse: "adopted child",
+        forwardAliases: ["Adopted child of"],
+        inverseAliases: ["Adoptive parent of"],
+      },
+      {
+        forward: "foster parent", inverse: "foster child",
+        forwardAliases: ["Foster child of"],
+        inverseAliases: ["Foster parent of"],
+      },
+      {
+        forward: "spouse", inverse: "spouse",
+        forwardAliases: ["wife", "husband", "Wife of", "Husband of", "Spouse of"],
+      },
+      {
+        forward: "sibling", inverse: "sibling",
+        forwardAliases: ["siblings", "brother", "sister", "Brother of", "Sister of", "Sibling of"],
+      },
+      {
+        forward: "half sibling", inverse: "half sibling",
+        forwardAliases: ["half-brother", "half-sister", "Half-brother of", "Half-sister of"],
+      },
+      {
+        forward: "step sibling", inverse: "step sibling",
+        forwardAliases: ["stepbrother", "stepsister", "Stepbrother of", "Stepsister of"],
+      },
+      {
+        forward: "twin", inverse: "twin",
+        forwardAliases: ["twins", "Twin of"],
+      },
+      {
+        forward: "grandparent", inverse: "grandchild",
+        forwardAliases: ["grandparents", "grandmother", "grandma", "grandfather", "grandpa", "Grandchild of", "Grandson of", "Granddaughter of"],
+        inverseAliases: ["grandchildren", "grandson", "granddaughter", "Grandparent of", "Grandfather of", "Grandmother of"],
+      },
+      {
+        forward: "great grandparent", inverse: "great grandchild",
+        forwardAliases: ["Great-grandchild of"],
+        inverseAliases: ["Great-grandparent of"],
+      },
+      {
+        forward: "aunt or uncle", inverse: "nibling",
+        forwardAliases: ["aunt", "uncle", "Nephew of", "Niece of"],
+        inverseAliases: ["niece", "nephew", "Uncle of", "Aunt of"],
+      },
+      {
+        forward: "cousin", inverse: "cousin",
+        forwardAliases: ["cousins", "Cousin of"],
+      },
+      {
+        forward: "parent in law", inverse: "child in law",
+        forwardAliases: ["mother-in-law", "father-in-law", "Son-in-law of", "Daughter-in-law of"],
+        inverseAliases: ["son-in-law", "daughter-in-law", "Father-in-law of", "Mother-in-law of"],
+      },
+      {
+        forward: "sibling in law", inverse: "sibling in law",
+        forwardAliases: ["brother-in-law", "sister-in-law", "Brother-in-law of", "Sister-in-law of"],
+      },
+      {
+        forward: "godparent", inverse: "godchild",
+        forwardAliases: ["godmother", "godfather", "Godchild of"],
+        inverseAliases: ["Godfather of", "Godmother of", "Godparent of"],
+      },
     ],
-
     romantic: [
-      { forward: "Boyfriend of",     inverse: "Girlfriend of" },
-      { forward: "Girlfriend of",    inverse: "Boyfriend of" },
-      { forward: "Fiancé of",        inverse: "Fiancée of" },
-      { forward: "Fiancée of",       inverse: "Fiancé of" },
-      { forward: "Engaged to",       inverse: "Engaged to" },
-      { forward: "Ex of",            inverse: "Ex of" },
-      { forward: "Ex-boyfriend of",  inverse: "Ex-girlfriend of" },
-      { forward: "Ex-girlfriend of", inverse: "Ex-boyfriend of" },
-      { forward: "Ex-husband of",    inverse: "Ex-wife of" },
-      { forward: "Ex-wife of",       inverse: "Ex-husband of" },
-      { forward: "Crush of",         inverse: "Crush of" },
-      { forward: "Lover of",         inverse: "Lover of" },
-      { forward: "Admirer of",       inverse: "Admired by" },
-      { forward: "Admired by",       inverse: "Admirer of" },
-      { forward: "In love with",     inverse: "Loved by" },
-      { forward: "Loved by",         inverse: "In love with" },
-      { forward: "Dating",           inverse: "Dating" },
+      {
+        forward: "partner", inverse: "partner",
+        forwardAliases: ["boyfriend", "girlfriend", "Boyfriend of", "Girlfriend of", "Partner of", "Life partner of", "Companion of"],
+      },
+      {
+        forward: "fiance", inverse: "fiance",
+        forwardAliases: ["fiancé", "fiancée", "Fiancé of", "Fiancée of", "Engaged to"],
+      },
+      {
+        forward: "ex partner", inverse: "ex partner",
+        forwardAliases: ["Ex of", "Ex-boyfriend of", "Ex-girlfriend of", "Ex-husband of", "Ex-wife of"],
+      },
+      {
+        forward: "lover", inverse: "lover",
+        forwardAliases: ["Lover of"],
+      },
+      {
+        forward: "admirer", inverse: "admired person",
+        forwardAliases: ["Admired by"],
+        inverseAliases: ["Admirer of"],
+      },
+      {
+        forward: "loved person", inverse: "loving person",
+        forwardAliases: ["crush", "In love with"],
+        inverseAliases: ["Loved by", "Crush of"],
+      },
+      {
+        forward: "dating", inverse: "dating",
+      },
     ],
-
     friendship: [
-      { forward: "Friend of",        inverse: "Friend of" },
-      { forward: "Best friend of",   inverse: "Best friend of" },
-      { forward: "Close friend of",  inverse: "Close friend of" },
-      { forward: "Childhood friend of", inverse: "Childhood friend of" },
-      { forward: "Acquaintance of",  inverse: "Acquaintance of" },
-      { forward: "Neighbor of",      inverse: "Neighbor of" },
-      { forward: "Roommate of",      inverse: "Roommate of" },
-      { forward: "Pen pal of",       inverse: "Pen pal of" },
-      { forward: "Ally of",          inverse: "Ally of" },
-      { forward: "Enemy of",         inverse: "Enemy of" },
-      { forward: "Rival of",         inverse: "Rival of" },
+      {
+        forward: "friend", inverse: "friend",
+        forwardAliases: ["friends", "Friend of"],
+      },
+      {
+        forward: "best friend", inverse: "best friend",
+        forwardAliases: ["Best friend of"],
+      },
+      {
+        forward: "close friend", inverse: "close friend",
+        forwardAliases: ["Close friend of"],
+      },
+      {
+        forward: "childhood friend", inverse: "childhood friend",
+        forwardAliases: ["Childhood friend of"],
+      },
+      {
+        forward: "acquaintance", inverse: "acquaintance",
+        forwardAliases: ["Acquaintance of"],
+      },
+      {
+        forward: "neighbor", inverse: "neighbor",
+        forwardAliases: ["neighbour", "Neighbor of"],
+      },
+      {
+        forward: "roommate", inverse: "roommate",
+        forwardAliases: ["Roommate of"],
+      },
+      {
+        forward: "pen pal", inverse: "pen pal",
+        forwardAliases: ["Pen pal of"],
+      },
+      {
+        forward: "ally", inverse: "ally",
+        forwardAliases: ["Ally of"],
+      },
+      {
+        forward: "enemy", inverse: "enemy",
+        forwardAliases: ["Enemy of"],
+      },
+      {
+        forward: "rival", inverse: "rival",
+        forwardAliases: ["Rival of"],
+      },
     ],
-
     professional: [
-      { forward: "Colleague of",     inverse: "Colleague of" },
-      { forward: "Coworker of",      inverse: "Coworker of" },
-      { forward: "Boss of",          inverse: "Employee of" },
-      { forward: "Employee of",      inverse: "Boss of" },
-      { forward: "Manager of",       inverse: "Managed by" },
-      { forward: "Managed by",       inverse: "Manager of" },
-      { forward: "Supervisor of",    inverse: "Supervised by" },
-      { forward: "Supervised by",    inverse: "Supervisor of" },
-      { forward: "Assistant of",     inverse: "Assisted by" },
-      { forward: "Assisted by",      inverse: "Assistant of" },
-      { forward: "Business partner of", inverse: "Business partner of" },
-      { forward: "Co-founder of",    inverse: "Co-founded by" },
-      { forward: "Co-founded by",    inverse: "Co-founder of" },
-      { forward: "Client of",        inverse: "Provider of" },
-      { forward: "Provider of",      inverse: "Client of" },
-      { forward: "Successor of",     inverse: "Predecessor of" },
-      { forward: "Predecessor of",   inverse: "Successor of" },
+      {
+        forward: "colleague", inverse: "colleague",
+        forwardAliases: ["coworker", "Colleague of", "Coworker of"],
+      },
+      {
+        forward: "manager", inverse: "employee",
+        forwardAliases: ["boss", "Employee of", "Managed by", "Supervised by"],
+        inverseAliases: ["Boss of", "Manager of", "Supervisor of"],
+      },
+      {
+        forward: "assistant", inverse: "assisted person",
+        forwardAliases: ["Assisted by"],
+        inverseAliases: ["Assistant of"],
+      },
+      {
+        forward: "business partner", inverse: "business partner",
+        forwardAliases: ["Business partner of"],
+      },
+      {
+        forward: "cofounder", inverse: "cofounded organization",
+        forwardAliases: ["Co-founded by"],
+        inverseAliases: ["Co-founder of"],
+      },
+      {
+        forward: "provider", inverse: "client",
+        forwardAliases: ["Client of"],
+        inverseAliases: ["Provider of"],
+      },
+      {
+        forward: "predecessor", inverse: "successor",
+        forwardAliases: ["Successor of"],
+        inverseAliases: ["Predecessor of"],
+      },
     ],
-
     education: [
-      { forward: "Teacher of",       inverse: "Student of" },
-      { forward: "Student of",       inverse: "Teacher of" },
-      { forward: "Mentor of",        inverse: "Mentee of" },
-      { forward: "Mentee of",        inverse: "Mentor of" },
-      { forward: "Tutor of",         inverse: "Tutored by" },
-      { forward: "Tutored by",       inverse: "Tutor of" },
-      { forward: "Classmate of",     inverse: "Classmate of" },
-      { forward: "Schoolmate of",    inverse: "Schoolmate of" },
-      { forward: "Professor of",     inverse: "Student of" },
-      { forward: "Apprentice of",    inverse: "Master of" },
-      { forward: "Master of",        inverse: "Apprentice of" },
+      {
+        forward: "teacher", inverse: "student",
+        forwardAliases: ["professor", "Student of"],
+        inverseAliases: ["Teacher of", "Professor of"],
+      },
+      {
+        forward: "mentor", inverse: "mentee",
+        forwardAliases: ["Mentee of"],
+        inverseAliases: ["Mentor of"],
+      },
+      {
+        forward: "tutor", inverse: "tutored person",
+        forwardAliases: ["Tutored by"],
+        inverseAliases: ["Tutor of"],
+      },
+      {
+        forward: "classmate", inverse: "classmate",
+        forwardAliases: ["Classmate of"],
+      },
+      {
+        forward: "schoolmate", inverse: "schoolmate",
+        forwardAliases: ["Schoolmate of"],
+      },
+      {
+        forward: "master", inverse: "apprentice",
+        forwardAliases: ["Apprentice of"],
+        inverseAliases: ["Master of"],
+      },
     ],
-
     creative: [
-      { forward: "Collaborator of",  inverse: "Collaborator of" },
-      { forward: "Inspired by",      inverse: "Inspiration for" },
-      { forward: "Inspiration for",  inverse: "Inspired by" },
-      { forward: "Influenced by",    inverse: "Influenced" },
-      { forward: "Influenced",       inverse: "Influenced by" },
-      { forward: "Bandmate of",      inverse: "Bandmate of" },
-      { forward: "Teammate of",      inverse: "Teammate of" },
+      {
+        forward: "collaborator", inverse: "collaborator",
+        forwardAliases: ["Collaborator of"],
+      },
+      {
+        forward: "inspiration", inverse: "inspired person",
+        forwardAliases: ["Inspired by"],
+        inverseAliases: ["Inspiration for"],
+      },
+      {
+        forward: "influence", inverse: "influenced person",
+        forwardAliases: ["Influenced by"],
+        inverseAliases: ["Influenced"],
+      },
+      {
+        forward: "bandmate", inverse: "bandmate",
+        forwardAliases: ["Bandmate of"],
+      },
+      {
+        forward: "teammate", inverse: "teammate",
+        forwardAliases: ["Teammate of"],
+      },
     ],
-
     misc: [
-      { forward: "Related to",       inverse: "Related to" },
-      { forward: "Knows",            inverse: "Known by" },
-      { forward: "Known by",         inverse: "Knows" },
-      { forward: "Introduced by",    inverse: "Introduced" },
-      { forward: "Introduced",       inverse: "Introduced by" },
-      { forward: "Companion of",     inverse: "Companion of" },
-      { forward: "Guardian of",      inverse: "Ward of" },
-      { forward: "Ward of",          inverse: "Guardian of" },
-      { forward: "Caretaker of",     inverse: "Cared for by" },
-      { forward: "Cared for by",     inverse: "Caretaker of" },
-      { forward: "Donor to",         inverse: "Recipient of" },
-      { forward: "Recipient of",     inverse: "Donor to" },
-      { forward: "Member of",        inverse: "Has member" },
-      { forward: "Has member",       inverse: "Member of" },
-      { forward: "Belongs to",       inverse: "Owner of" },
-      { forward: "Owner of",         inverse: "Belongs to" },
-      { forward: "Created by",       inverse: "Creator of" },
-      { forward: "Creator of",       inverse: "Created by" },
-      { forward: "Founded by",       inverse: "Founder of" },
-      { forward: "Founder of",       inverse: "Founded by" },
+      {
+        forward: "relative", inverse: "relative",
+        forwardAliases: ["Related to"],
+      },
+      {
+        forward: "knows", inverse: "known by",
+      },
+      {
+        forward: "introducer", inverse: "introduced person",
+        forwardAliases: ["Introduced by"],
+        inverseAliases: ["Introduced"],
+      },
+      {
+        forward: "guardian", inverse: "ward",
+        forwardAliases: ["Ward of"],
+        inverseAliases: ["Guardian of"],
+      },
+      {
+        forward: "caretaker", inverse: "cared for person",
+        forwardAliases: ["Cared for by"],
+        inverseAliases: ["Caretaker of"],
+      },
+      {
+        forward: "donor", inverse: "recipient",
+        forwardAliases: ["Recipient of"],
+        inverseAliases: ["Donor to"],
+      },
+      {
+        forward: "organization", inverse: "member",
+        forwardAliases: ["Member of"],
+        inverseAliases: ["Has member"],
+      },
+      {
+        forward: "owner", inverse: "owned item",
+        forwardAliases: ["Belongs to"],
+        inverseAliases: ["Owner of"],
+      },
+      {
+        forward: "creator", inverse: "creation",
+        forwardAliases: ["Created by"],
+        inverseAliases: ["Creator of"],
+      },
+      {
+        forward: "founder", inverse: "founded organization",
+        forwardAliases: ["Founded by"],
+        inverseAliases: ["Founder of"],
+      },
     ],
   },
 };

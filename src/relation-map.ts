@@ -1,5 +1,9 @@
 import type { RelationPair } from "./types";
 
+export function relationKeys(pair: RelationPair, side: "forward" | "inverse"): string[] {
+  return [pair[side], ...(pair[`${side}Aliases`] ?? [])].map((key) => key.trim()).filter(Boolean);
+}
+
 /**
  * Build a case-insensitive lookup map from forward key → inverse key.
  * Both directions are always registered so that symmetric pairs (e.g.
@@ -12,18 +16,11 @@ export function buildRelationMap(
   for (const pair of relations) {
     // Skip disabled pairs
     if (pair.enabled === false) continue;
-    const fwdKey = pair.forward.trim().toLowerCase();
-    const invKey = pair.inverse.trim().toLowerCase();
     const fwdVal = pair.forward.trim();
     const invVal = pair.inverse.trim();
-    
-    if (fwdKey && invKey) {
-      map.set(fwdKey, invVal);
-      // Always register the inverse direction so symmetric and asymmetric
-      // pairs are both handled no matter which note the user edits first.
-      if (!map.has(invKey)) {
-        map.set(invKey, fwdVal);
-      }
+    if (fwdVal && invVal) {
+      for (const key of relationKeys(pair, "forward")) map.set(key.toLowerCase(), invVal);
+      for (const key of relationKeys(pair, "inverse")) map.set(key.toLowerCase(), fwdVal);
     }
   }
   return map;

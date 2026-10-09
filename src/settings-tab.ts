@@ -1,16 +1,17 @@
 import { type App, Modal, Notice, PluginSettingTab, Setting, TFile } from "obsidian";
 import type RelationSyncPlugin from "./main";
-import { DEFAULT_SETTINGS, type RelationPair } from "./types";
-import type { BulkSyncPlan, BulkSyncProgress, SyncLogEntry } from "./sync-engine";
-import { validateRelationPairs } from "./validation";
+import { type RelationPair } from "./types";
+import { type BulkSyncPlan, type BulkSyncProgress, type SyncLogEntry, SyncEngine } from "./sync-engine";
+import { isRelationPair, validateRelationPairs } from "./validation";
 import {
   type CategoryId,
   t,
-  detectLocale,
   getDefaultRelations,
   getCategoryForKey,
   pairMatchesLocale,
 } from "./locales";
+import { relationKeys } from "./relation-map";
+import { enablePresetPairs } from "./settings";
 
 // ── Category helpers ─────────────────────────────────────────────────────
 
@@ -80,8 +81,8 @@ class SyncLogModal extends Modal {
     const tbody = table.createEl("tbody");
     for (const e of this.entries) {
       const tr = tbody.createEl("tr");
-      tr.createEl("td", { text: e.file.split("/").pop() ?? e.file });
-      tr.createEl("td", { text: e.action, cls: `sync-log-${e.action}` });
+      tr.createEl("td", { text: e.file });
+      tr.createEl("td", { text: e.action === "added" ? strings.logAdded : strings.logRemoved, cls: `sync-log-${e.action}` });
       tr.createEl("td", { text: e.key });
       tr.createEl("td", { text: e.link });
     }
@@ -125,6 +126,7 @@ class BulkSyncPreviewModal extends Modal {
     app: App,
     private readonly plan: BulkSyncPlan,
     private readonly onConfirm: () => void,
+    private readonly undo = false,
   ) {
     super(app);
   }
@@ -134,9 +136,9 @@ class BulkSyncPreviewModal extends Modal {
     const { contentEl } = this;
     contentEl.empty();
 
-    new Setting(contentEl).setName(strings.bulkPreviewTitle).setHeading();
+    new Setting(contentEl).setName(this.undo ? strings.undoPreviewTitle : strings.bulkPreviewTitle).setHeading();
     contentEl.createEl("p", {
-      text: strings.bulkPreviewDesc(this.plan.entries.length, this.plan.filesScanned),
+      text: this.undo ? strings.undoChanges(this.plan.entries.length) : strings.bulkPreviewDesc(this.plan.entries.length, this.plan.filesScanned),
       cls: "setting-item-description",
     });
     contentEl.createEl("p", {
@@ -156,7 +158,7 @@ class BulkSyncPreviewModal extends Modal {
       for (const entry of this.plan.entries.slice(0, 200)) {
         const tr = tbody.createEl("tr");
         tr.createEl("td", { text: entry.file });
-        tr.createEl("td", { text: entry.action, cls: `sync-log-${entry.action}` });
+        tr.createEl("td", { text: entry.action === "added" ? strings.logAdded : strings.logRemoved, cls: `sync-log-${entry.action}` });
         tr.createEl("td", { text: entry.key });
         tr.createEl("td", { text: entry.link });
       }
@@ -170,11 +172,21 @@ class BulkSyncPreviewModal extends Modal {
       contentEl.createEl("p", { text: strings.noSyncChanges, cls: "setting-item-description" });
     }
 
+    if (this.plan.problems.length > 0) {
+      contentEl.createEl("h3", { text: strings.problemsHeading });
+      const list = contentEl.createEl("ul");
+      for (const problem of this.plan.problems) {
+        const reason = problem.reason === "missing" ? strings.problemMissing :
+          problem.reason === "excluded" ? strings.problemExcluded : problem.reason === "value" ? strings.problemValue : strings.problemInvalid;
+        list.createEl("li", { text: `${problem.file} · ${problem.key} · [[${problem.link}]]: ${reason}` });
+      }
+    }
     new Setting(contentEl)
       .addButton((btn) => btn.setButtonText(strings.cancelButton).onClick(() => this.close()))
       .addButton((btn) =>
         btn
-          .setButtonText(strings.confirmBulkSyncButton)
+          .setButtonText(this.undo ? strings.undoLastSyncButton : strings.confirmBulkSyncButton)
+          .setDisabled(this.plan.entries.length === 0)
           .setWarning()
           .onClick(() => {
             this.onConfirm();
@@ -227,482 +239,275 @@ class BulkSyncRunningModal extends Modal {
   }
 }
 
-// ── Settings tab ─────────────────────────────────────────────────────────
+function validationIssues(pairs: RelationPair[]) {
+  const strings = t();
+  return validateRelationPairs(pairs, {
+    emptyField: strings.validationEmptyField,
+
+    duplicatePair: strings.validationDuplicatePair,
+    conflictingKey: strings.validationConflictingKey,
+  });
+}
+
+export function showSyncPreview(app: App, engine: SyncEngine, sourceFile?: TFile, onDone?: () => void): void {
+  const strings = t();
+  if (engine.getState() === "blocked") {
+    new Notice(strings.configInvalidDesc);
+    return;
+  }
+  const plan = engine.previewBulkSync(sourceFile);
+  new BulkSyncPreviewModal(app, plan, () => {
+    void (async () => {
+      const running = new BulkSyncRunningModal(app, () => engine.cancelBulkSync());
+      running.open();
+      try {
+        const result = await engine.runBulkSync((progress) => running.update(progress), sourceFile, plan);
+        new Notice(result.cancelled ? strings.bulkSyncCancelledNotice(result.log.length) :
+          strings.syncResult(result.scanned, result.count, result.log.length, result.failed));
+        new SyncLogModal(app, result.log).open();
+      } catch (error) {
+        new Notice(error instanceof Error ? error.message : strings.bulkSyncFailedNotice);
+      } finally {
+        running.close();
+        onDone?.();
+      }
+    })();
+  }).open();
+}
+
+class PairEditModal extends Modal {
+  constructor(app: App, private readonly pairs: RelationPair[], private readonly index: number | undefined,
+    private readonly onSave: (pair: RelationPair) => Promise<void>) { super(app); }
+
+  onOpen(): void {
+    const strings = t();
+    const draft: RelationPair = this.index === undefined ? { forward: "", inverse: "", enabled: true } :
+      structuredClone(this.pairs[this.index]!);
+    const { contentEl } = this;
+    new Setting(contentEl).setName(this.index === undefined ? strings.addPairButton : strings.editPair).setHeading();
+    for (const side of ["forward", "inverse"] as const) {
+      new Setting(contentEl).setName(side === "forward" ? strings.forwardLabel : strings.inverseLabel)
+        .addText((text) => {
+          text.setValue(draft[side]).setPlaceholder(side === "forward" ? strings.forwardPlaceholder : strings.inversePlaceholder)
+            .onChange((value) => { draft[side] = value; errorEl.setText(""); });
+          text.inputEl.setAttribute("aria-label", side === "forward" ? strings.forwardLabel : strings.inverseLabel);
+        });
+      new Setting(contentEl).setName(side === "forward" ? strings.forwardAliasesLabel : strings.inverseAliasesLabel)
+        .setDesc(strings.aliasesDesc).addTextArea((text) => {
+          text.setValue((draft[`${side}Aliases`] ?? []).join(", ")).setPlaceholder(strings.aliasesPlaceholder)
+            .onChange((value) => { draft[`${side}Aliases`] = [...new Set(value.split(",").map((key) => key.trim()).filter(Boolean))]; errorEl.setText(""); });
+          text.inputEl.setAttribute("aria-label", side === "forward" ? strings.forwardAliasesLabel : strings.inverseAliasesLabel);
+        });
+    }
+    new Setting(contentEl).setName(strings.pairEnabled).addToggle((toggle) =>
+      toggle.setValue(draft.enabled !== false).onChange((value) => { draft.enabled = value; }));
+    const errorEl = contentEl.createDiv({ cls: "relation-sync-validation" });
+    errorEl.setAttribute("role", "alert");
+    new Setting(contentEl)
+      .addButton((btn) => btn.setButtonText(strings.cancelButton).onClick(() => this.close()))
+      .addButton((btn) => btn.setButtonText(strings.savePair).setCta().onClick(() => {
+        draft.forward = draft.forward.trim();
+        draft.inverse = draft.inverse.trim();
+        if (!draft.forward || !draft.inverse) { errorEl.setText(strings.validationEmptyField); return; }
+        const proposed = [...this.pairs];
+        if (this.index === undefined) proposed.push(draft); else proposed[this.index] = draft;
+        const issues = validationIssues(proposed);
+        if (issues.length > 0) { errorEl.setText([...new Set(issues.map((issue) => issue.message))].join(" ")); return; }
+        btn.setDisabled(true);
+        void this.onSave(draft).then(() => this.close()).catch((error: unknown) => {
+          btn.setDisabled(false);
+          errorEl.setText(error instanceof Error ? error.message : strings.configInvalidDesc);
+        });
+      }));
+  }
+
+  onClose(): void { this.contentEl.empty(); }
+}
 
 export class RelationSyncSettingTab extends PluginSettingTab {
   private readonly plugin: RelationSyncPlugin;
   private searchQuery = "";
-  private showAllLanguages = false;
+  private languageFilter = "all";
+  private readonly openCategories = new Set<string>(["family", "custom"]);
+  private advancedOpen = false;
 
-  constructor(app: App, plugin: RelationSyncPlugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
+  constructor(app: App, plugin: RelationSyncPlugin) { super(app, plugin); this.plugin = plugin; }
 
   display(): void {
     const { containerEl } = this;
+    const strings = t();
+    const scrollTop = containerEl.scrollTop;
     containerEl.empty();
+    activeWindow.requestAnimationFrame(() => { containerEl.scrollTop = scrollTop; });
+    new Setting(containerEl).setName(strings.pluginTitle).setDesc(strings.pluginDescription).setHeading();
+    const statusEl = containerEl.createDiv({ cls: "relation-sync-status" });
+    statusEl.setAttribute("role", "status");
+    const updateStatus = () => {
+      const state = this.plugin.engine.getState();
+      statusEl.setText(state === "ready" ? strings.stateReady : state === "paused" ? strings.statePaused : strings.stateBlocked);
+      statusEl.toggleClass("relation-sync-warning", state === "blocked");
+    };
+    updateStatus();
+    new Setting(containerEl).setName(strings.syncEnabled).setDesc(strings.syncEnabledDesc).addToggle((toggle) =>
+      toggle.setValue(this.plugin.settings.syncEnabled).onChange((value) => {
+        this.plugin.settings.syncEnabled = value;
+        void this.plugin.saveSettings().then(updateStatus);
+      }));
 
-    const strings = t();
-    const locale = detectLocale();
+    const start = containerEl.createDiv({ cls: "relation-sync-start" });
+    new Setting(start).setName(strings.firstRunTitle).setHeading();
+    start.createEl("p", { text: strings.firstRunDesc });
+    const examples = start.createDiv({ cls: "relation-sync-examples" });
+    for (const [name, key, target] of [[strings.exampleSource, strings.exampleForward, strings.exampleTarget],
+      [strings.exampleTarget, strings.exampleInverse, strings.exampleSource]]) {
+      const example = examples.createDiv();
+      example.createEl("strong", { text: name });
+      example.createEl("pre", { text: `---\n${key}: "[[${target?.replace(/\.md$/, "")}]]"\n---` });
+    }
+    new Setting(start).setName(strings.checkCurrentNote).setDesc(strings.checkCurrentNoteDesc).addButton((btn) =>
+      btn.setButtonText(strings.checkCurrentNote).setCta().onClick(() => this.previewCurrent()));
 
-    // ── Header ────────────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(strings.pluginTitle)
-      .setDesc(strings.pluginDescription)
-      .setHeading();
-
-    // ── Global safety controls ────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(strings.syncEnabled)
-      .setDesc(strings.syncEnabledDesc)
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.syncEnabled !== false).onChange((val) => {
-          this.plugin.settings.syncEnabled = val;
-          void this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(strings.viewRecentLog)
-      .setDesc(strings.viewRecentLogDesc)
-      .addButton((btn) =>
-        btn
-          .setButtonText(strings.viewRecentLogButton)
-          .onClick(() => new SyncLogModal(this.app, this.plugin.engine.getRecentLog()).open()),
-      );
-
-    new Setting(containerEl)
-      .setName(strings.undoLastSync)
-      .setDesc(strings.undoLastSyncDesc)
-      .addButton((btn) =>
-        btn
-          .setButtonText(strings.undoLastSyncButton)
-          .setWarning()
-          .onClick(() => {
-            if (!this.plugin.engine.canUndoLastSync()) {
-              new Notice(strings.noUndoAvailable);
-              return;
-            }
-            new ConfirmModal(this.app, strings.undoLastSyncConfirm, () => {
-              void (async () => {
-                const { count, log } = await this.plugin.engine.undoLastSync();
-                new Notice(strings.undoLastSyncNotice(count));
-                new SyncLogModal(this.app, log).open();
-              })();
-            }).open();
-          }),
-      );
-
-    // ── Reset ─────────────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(strings.resetToDefaults)
-      .setDesc(strings.resetToDefaultsDesc)
-      .addButton((btn) =>
-        btn
-          .setButtonText(strings.resetToDefaultsButton)
-          .setWarning()
-          .onClick(() => {
-            new ConfirmModal(this.app, strings.resetConfirm, () => {
-              void (async () => {
-                this.plugin.settings = {
-                  ...DEFAULT_SETTINGS,
-                  relations: getDefaultRelations(locale).map((relation) => ({
-                    ...relation,
-                  })),
-                };
-                await this.plugin.saveSettings();
-                new Notice(strings.resetNotice);
-                this.display();
-              })();
-            }).open();
-          }),
-      );
-
-    // ── Bulk Sync ─────────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(strings.syncVault)
-      .setDesc(strings.syncVaultDesc)
-      .addButton((btn) =>
-        btn
-          .setButtonText(strings.syncVaultButton)
-          .setWarning()
-          .onClick(() => void this.runBulkSync()),
-      );
-
-    containerEl.createEl("hr");
-
-    // ── Export pairs ──────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(strings.exportPairs)
-      .setDesc(strings.exportPairsDesc)
-      .addButton((btn) =>
-        btn
-          .setButtonText(strings.exportPairsButton)
-          .onClick(() => void this.exportPairs()),
-      );
-
-    // ── Import pairs ──────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(strings.importPairs)
-      .setDesc(strings.importPairsDesc)
-      .addButton((btn) =>
-        btn
-          .setButtonText(strings.importPairsButton)
-          .onClick(() => void this.importPairs()),
-      );
-
-    containerEl.createEl("hr");
-
-    // ── Exclude paths ─────────────────────────────────────────────────
-    new Setting(containerEl)
-      .setName(strings.excludePaths)
-      .setDesc(strings.excludePathsDesc)
-      .addText((text) =>
-        text
-          .setPlaceholder(strings.excludePathsPlaceholder)
-          .setValue(this.plugin.settings.excludePaths ?? "")
-          .onChange((val) => {
-            this.plugin.settings.excludePaths = val;
-            void this.plugin.saveSettings();
-          }),
-      );
-
-    containerEl.createEl("hr");
-
-    // ── Show all languages toggle ──────────────────────────────────────
-    new Setting(containerEl)
-      .setName(strings.showAllLanguages)
-      .setDesc(strings.showAllLanguagesDesc)
-      .addToggle((toggle) =>
-        toggle.setValue(this.showAllLanguages).onChange((val) => {
-          this.showAllLanguages = val;
-          this.renderRelations(listEl, countEl, locale);
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(strings.enableCurrentLanguage)
-      .setDesc(strings.enableCurrentLanguageDesc)
-      .addButton((btn) =>
-        btn.setButtonText(strings.enableCurrentLanguage).onClick(() => {
-          void this.setLocaleEnabled(locale, true, true);
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName(strings.disableOtherLanguages)
-      .setDesc(strings.disableOtherLanguagesDesc)
-      .addButton((btn) =>
-        btn.setButtonText(strings.disableOtherLanguages).onClick(() => {
-          void this.disableOtherLocales(locale);
-        }),
-      );
-
-    // ── Search / filter ────────────────────────────────────────────────
-    const searchSetting = new Setting(containerEl).setName(
-      strings.filterRelations,
-    );
-    searchSetting.addSearch((search) =>
-      search
-        .setPlaceholder(strings.searchPlaceholder)
-        .setValue(this.searchQuery)
-        .onChange((val) => {
-          this.searchQuery = val;
-          this.renderRelations(listEl, countEl, locale);
-        }),
-    );
-
-    // ── + Add pair ────────────────────────────────────────────────────
-    new Setting(containerEl).addButton((btn) =>
-      btn
-        .setButtonText(strings.addPairButton)
-        .setCta()
-        .onClick(() => {
-          void (async () => {
-            this.plugin.settings.relations.push({
-              forward: "",
-              inverse: "",
-              enabled: true,
-            });
-            await this.plugin.saveSettings();
-            this.searchQuery = "";
-            this.display();
-            // Scroll the list to bottom after DOM update
-            activeWindow.requestAnimationFrame(() => {
-              listEl.scrollTop = listEl.scrollHeight;
-            });
-          })();
-        }),
-    );
-
-    // ── Count label ────────────────────────────────────────────────────
-    const countEl = containerEl.createDiv({
-      cls: "relation-sync-count",
-      text: strings.pairsTotal(this.plugin.settings.relations.length),
-    });
-
-    // ── Scrollable relations list ──────────────────────────────────────
+    new Setting(containerEl).setName(strings.relationsHeading).setDesc(strings.aliasesDesc).setHeading();
+    new Setting(containerEl).setName(strings.languageFilter).addDropdown((dropdown) =>
+      dropdown.addOptions({ all: strings.allLanguages, en: "English", it: "Italiano" }).setValue(this.languageFilter)
+        .onChange((value) => { this.languageFilter = value; this.renderRelations(listEl, countEl); }));
+    new Setting(containerEl).setName(strings.filterRelations).addSearch((search) => {
+      search.setValue(this.searchQuery).setPlaceholder(strings.searchPlaceholder)
+        .onChange((value) => { this.searchQuery = value; this.renderRelations(listEl, countEl); });
+      search.inputEl.setAttribute("aria-label", strings.filterRelations);
+    }).addButton((btn) => btn.setButtonText(strings.addPairButton).onClick(() => this.editPair()));
+    const countEl = containerEl.createDiv({ cls: "relation-sync-count" });
     const listEl = containerEl.createDiv({ cls: "relation-sync-list" });
-    this.renderRelations(listEl, countEl, locale);
+    this.renderRelations(listEl, countEl);
+
+    const advanced = containerEl.createEl("details", { cls: "relation-sync-advanced" });
+    advanced.open = this.advancedOpen;
+    advanced.addEventListener("toggle", () => { this.advancedOpen = advanced.open; });
+    advanced.createEl("summary", { text: strings.advancedHeading });
+    const tools = advanced.createDiv();
+    new Setting(tools).setName(strings.syncVault).setDesc(strings.syncVaultDesc).addButton((btn) =>
+      btn.setButtonText(strings.syncVaultButton).onClick(() => showSyncPreview(this.app, this.plugin.engine, undefined, () => this.display())));
+    new Setting(tools).setName(strings.viewRecentLog).setDesc(strings.viewRecentLogDesc).addButton((btn) =>
+      btn.setButtonText(strings.viewRecentLogButton).onClick(() => new SyncLogModal(this.app, this.plugin.engine.getRecentLog()).open()));
+    new Setting(tools).setName(strings.undoLastSync).setDesc(strings.undoSessionDesc).addButton((btn) =>
+      btn.setButtonText(strings.undoLastSyncButton).setDisabled(!this.plugin.engine.canUndoLastSync()).onClick(() => this.previewUndo()));
+    new Setting(tools).setName(strings.excludePaths).setDesc(strings.excludePathsDesc).addText((text) => {
+      text.setValue(this.plugin.settings.excludePaths).setPlaceholder(strings.excludePathsPlaceholder)
+        .onChange((value) => { this.plugin.settings.excludePaths = value; void this.plugin.saveSettings(); });
+      text.inputEl.setAttribute("aria-label", strings.excludePaths);
+    });
+    new Setting(tools).setName(strings.languagePresets).setDesc(strings.languagePresetsDesc)
+      .addButton((btn) => btn.setButtonText(strings.enableEnglish).onClick(() => void this.enablePreset("en")))
+      .addButton((btn) => btn.setButtonText(strings.enableItalian).onClick(() => void this.enablePreset("it")));
+    new Setting(tools).setName(strings.exportPairs).setDesc(strings.exportPairsDesc).addButton((btn) =>
+      btn.setButtonText(strings.exportPairsButton).onClick(() => void this.exportPairs()));
+    new Setting(tools).setName(strings.importPairs).setDesc(strings.importPairsDesc).addButton((btn) =>
+      btn.setButtonText(strings.importPairsButton).onClick(() => this.importPairs()));
+    new Setting(tools).setName(strings.resetToDefaults).setDesc(strings.resetToDefaultsDesc).addButton((btn) =>
+      btn.setButtonText(strings.resetToDefaultsButton).setWarning().onClick(() => {
+        new ConfirmModal(this.app, strings.resetConfirm, () => {
+          this.plugin.settings.relations = getDefaultRelations();
+          void this.plugin.saveSettings().then(() => { new Notice(strings.resetNotice); this.display(); });
+        }).open();
+      }));
   }
 
-  // ── Render the grouped, filterable relation list ──────────────────────
-
-  private renderRelations(
-    container: HTMLElement,
-    countEl: HTMLElement,
-    locale: string,
-  ): void {
-    container.empty();
-
-    const strings = t();
-    const query = this.searchQuery.toLowerCase().trim();
-    const relations = this.plugin.settings.relations;
-    const validationIssues = validateRelationPairs(relations, {
-      emptyField: strings.validationEmptyField,
-      sameField: strings.validationSameField,
-      duplicatePair: strings.validationDuplicatePair,
-      conflictingKey: strings.validationConflictingKey,
-    });
-    const issuesByIndex = new Map<number, string[]>();
-    for (const issue of validationIssues) {
-      const messages = issuesByIndex.get(issue.index) ?? [];
-      messages.push(issue.message);
-      issuesByIndex.set(issue.index, messages);
-    }
-
-    if (validationIssues.length > 0) {
-      const warningEl = container.createDiv({ cls: "relation-sync-warning" });
-      warningEl.createDiv({ text: strings.configInvalidTitle, cls: "relation-sync-warning-title" });
-      warningEl.createDiv({ text: strings.configInvalidDesc });
-    }
-
-    // Group by category ID
-    const grouped = new Map<
-      CategoryId | "custom",
-      { pair: RelationPair; index: number }[]
-    >();
-    let visibleCount = 0;
-
-    for (let i = 0; i < relations.length; i++) {
-      const pair = relations[i];
-      if (!pair) continue;
-
-      // Language filter (unless showing all)
-      if (!this.showAllLanguages && !pairMatchesLocale(pair, locale)) continue;
-
-      // Apply search filter
-      if (query) {
-        const fwd = pair.forward.toLowerCase();
-        const inv = pair.inverse.toLowerCase();
-        if (!fwd.includes(query) && !inv.includes(query)) continue;
-      }
-
-      const catId = getCategoryForKey(pair.forward);
-      if (!grouped.has(catId)) grouped.set(catId, []);
-      grouped.get(catId)!.push({ pair, index: i });
-      visibleCount++;
-    }
-
-    // Update count
-    if (query || !this.showAllLanguages) {
-      countEl.textContent = strings.pairsShown(visibleCount, relations.length);
-    } else {
-      countEl.textContent = strings.pairsTotal(relations.length);
-    }
-
-    // Sort categories by defined order
-    const sortedCategories = [...grouped.keys()].sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a);
-      const ib = CATEGORY_ORDER.indexOf(b);
-      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-    });
-
-    if (sortedCategories.length === 0) {
-      container.createDiv({
-        text: query ? strings.noSearchResults : strings.noRelations,
-        cls: "relation-sync-empty",
-      });
-      return;
-    }
-
-    for (const catId of sortedCategories) {
-      const items = grouped.get(catId)!;
-      const label = categoryLabel(catId);
-
-      const details = container.createEl("details", {
-        cls: "relation-sync-category",
-      });
-      // Auto-open when searching, or for small/custom groups
-      if (query || catId === "custom") {
-        details.open = true;
-      }
-
-      const summary = details.createEl("summary");
-      summary.createSpan({
-        text: label,
-        cls: "relation-sync-cat-label",
-      });
-      summary.createSpan({
-        text: ` (${items.length})`,
-        cls: "relation-sync-cat-count",
-      });
-      const actionEl = summary.createSpan({ cls: "relation-sync-cat-actions" });
-      const enableButton = actionEl.createEl("button", {
-        text: strings.enableVisibleCategory,
-        cls: "clickable-icon relation-sync-cat-button",
-      });
-      enableButton.type = "button";
-      enableButton.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void this.setCategoryEnabled(items.map((item) => item.index), true);
-      });
-      const disableButton = actionEl.createEl("button", {
-        text: strings.disableVisibleCategory,
-        cls: "clickable-icon relation-sync-cat-button",
-      });
-      disableButton.type = "button";
-      disableButton.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void this.setCategoryEnabled(items.map((item) => item.index), false);
-      });
-
-      const rowsEl = details.createDiv({ cls: "relation-sync-rows" });
-      for (const { pair, index } of items) {
-        this.renderPairRow(rowsEl, pair, index, issuesByIndex.get(index) ?? []);
-      }
-    }
+  private previewCurrent(): void {
+    const file = this.app.workspace.getActiveFile();
+    if (!(file instanceof TFile) || file.extension !== "md") { new Notice(t().noActiveNote); return; }
+    showSyncPreview(this.app, this.plugin.engine, file, () => this.display());
   }
 
-  // ── Single pair row ───────────────────────────────────────────────────
-
-  private renderPairRow(
-    containerEl: HTMLElement,
-    pair: RelationPair,
-    index: number,
-    issues: string[],
-  ): void {
-    const strings = t();
-    const isEnabled = pair.enabled !== false;
-    const setting = new Setting(containerEl);
-    setting.settingEl.addClass("relation-sync-row");
-    if (!isEnabled) setting.settingEl.addClass("relation-sync-row--disabled");
-    if (issues.length > 0) setting.settingEl.addClass("relation-sync-row--invalid");
-
-    // Enable / Disable toggle button
-    setting.addExtraButton((btn) =>
-      btn
-        .setIcon(isEnabled ? "check-circle" : "circle")
-        .setTooltip(strings.togglePairTooltip)
-        .onClick(() => {
-          void (async () => {
-            pair.enabled = !isEnabled;
-            await this.plugin.saveSettings();
-            // Re-render
-            this.display();
-          })();
-        }),
-    );
-
-    // Forward key input
-    setting.addText((text) =>
-      text
-        .setPlaceholder(strings.forwardPlaceholder)
-        .setValue(pair.forward)
-        .onChange((val) => {
-          pair.forward = val;
-          void this.plugin.saveSettings();
-        }),
-    );
-
-    // Arrow separator
-    setting.controlEl.createSpan({
-      text: " ↔ ",
-      cls: "relation-sync-arrow",
-    });
-
-    // Inverse key input
-    setting.addText((text) =>
-      text
-        .setPlaceholder(strings.inversePlaceholder)
-        .setValue(pair.inverse)
-        .onChange((val) => {
-          pair.inverse = val;
-          void this.plugin.saveSettings();
-        }),
-    );
-
-    if (issues.length > 0) {
-      setting.descEl.setText(issues.join(" "));
-      setting.descEl.addClass("relation-sync-validation");
-    }
-
-    // Delete button
-    setting.addExtraButton((btn) =>
-      btn
-        .setIcon("trash")
-        .setTooltip(strings.removePairTooltip)
-        .onClick(() => {
-          void (async () => {
-            this.plugin.settings.relations.splice(index, 1);
-            await this.plugin.saveSettings();
-            this.display();
-          })();
-        }),
-    );
+  private previewUndo(): void {
+    const entries = this.plugin.engine.getUndoBatch();
+    new BulkSyncPreviewModal(this.app, {
+      entries: entries.map((entry) => ({ ...entry, action: entry.action === "added" ? "removed" : "added" })), problems: [], filesScanned: 0, filesToChange: new Set(entries.map((entry) => entry.file)).size,
+      added: entries.filter((entry) => entry.action === "removed").length,
+      removed: entries.filter((entry) => entry.action === "added").length,
+    }, () => {
+      void this.plugin.engine.undoLastSync(entries).then((result) => {
+        new Notice(t().undoLastSyncNotice(result.count));
+        new SyncLogModal(this.app, result.log).open();
+        this.display();
+      }).catch((error: unknown) => new Notice(error instanceof Error ? error.message : t().bulkSyncFailedNotice));
+    }, true).open();
   }
 
-  // ── Bulk sync ────────────────────────────────────────────────────────
-
-  private async runBulkSync(): Promise<void> {
-    const strings = t();
-    const plan = this.plugin.engine.previewBulkSync();
-    new BulkSyncPreviewModal(this.app, plan, () => {
-      void (async () => {
-        const running = new BulkSyncRunningModal(this.app, () => this.plugin.engine.cancelBulkSync());
-        running.open();
-        const { count, log, cancelled } = await this.plugin.engine.runBulkSync((progress) => {
-          running.update(progress);
-        });
-        running.close();
-        new Notice(cancelled ? strings.bulkSyncCancelledNotice(log.length) : strings.syncNotice(count));
-        new SyncLogModal(this.app, log).open();
-      })();
+  private editPair(index?: number): void {
+    new PairEditModal(this.app, this.plugin.settings.relations, index, async (pair) => {
+      if (index === undefined) this.plugin.settings.relations.push(pair); else this.plugin.settings.relations[index] = pair;
+      await this.plugin.saveSettings();
+      this.display();
     }).open();
   }
 
-  private async setCategoryEnabled(indexes: number[], enabled: boolean): Promise<void> {
-    for (const index of indexes) {
-      const pair = this.plugin.settings.relations[index];
-      if (pair) pair.enabled = enabled;
+  private renderRelations(container: HTMLElement, countEl: HTMLElement): void {
+    container.empty();
+    const strings = t();
+    const relations = this.plugin.settings.relations;
+    const issues = validationIssues(relations);
+    const query = this.searchQuery.trim().toLowerCase();
+    countEl.setText(strings.activePairs(relations.filter((pair) => pair.enabled !== false).length, relations.length));
+    if (issues.length > 0) {
+      const warning = container.createDiv({ cls: "relation-sync-warning", text: strings.configInvalidDesc });
+      warning.setAttribute("role", "alert");
     }
-    await this.plugin.saveSettings();
-    this.display();
+    const grouped = new Map<CategoryId | "custom", { pair: RelationPair; index: number }[]>();
+    for (const [index, pair] of relations.entries()) {
+      if (this.languageFilter !== "all" && !pairMatchesLocale(pair, this.languageFilter)) continue;
+      const keys = [...relationKeys(pair, "forward"), ...relationKeys(pair, "inverse")];
+      if (query && !keys.some((key) => key.toLowerCase().includes(query))) continue;
+      const category = getCategoryForKey(pair.forward);
+      const rows = grouped.get(category) ?? [];
+      rows.push({ pair, index }); grouped.set(category, rows);
+    }
+    if (grouped.size === 0) container.createEl("p", { text: query ? strings.noSearchResults : strings.noRelations });
+    for (const category of CATEGORY_ORDER) {
+      const rows = grouped.get(category);
+      if (!rows) continue;
+      const details = container.createEl("details", { cls: "relation-sync-category" });
+      details.open = Boolean(query) || this.openCategories.has(category);
+      details.addEventListener("toggle", () => {
+        if (this.searchQuery) return;
+        if (details.open) this.openCategories.add(category); else this.openCategories.delete(category);
+      });
+      details.createEl("summary", { text: `${categoryLabel(category)} · ${rows.length}` });
+      for (const { pair, index } of rows) {
+        const aliases = [...(pair.forwardAliases ?? []), ...(pair.inverseAliases ?? [])];
+        const row = new Setting(details).setName(`${pair.forward} ↔ ${pair.inverse}`)
+          .setDesc(aliases.join(", "));
+        row.settingEl.addClass("relation-sync-row");
+        row.addToggle((toggle) => {
+          toggle.setValue(pair.enabled !== false).onChange((value) => {
+            const proposed = relations.map((existing, i) => i === index ? { ...existing, enabled: value } : existing);
+            const errors = validationIssues(proposed);
+            if (value && errors.length > 0) {
+              toggle.setValue(false); new Notice(errors.map((error) => error.message).join(" ")); return;
+            }
+            pair.enabled = value;
+            void this.plugin.saveSettings().then(() => this.display());
+          });
+          toggle.toggleEl.setAttribute("aria-label", `${strings.pairEnabled}: ${pair.forward} ↔ ${pair.inverse}`);
+        });
+        row.addButton((btn) => btn.setButtonText(strings.editPair).onClick(() => this.editPair(index)))
+          .addExtraButton((btn) => btn.setIcon("trash").setTooltip(strings.removePairTooltip).onClick(() => {
+            relations.splice(index, 1); void this.plugin.saveSettings().then(() => this.display());
+          }));
+        const errors = issues.filter((issue) => issue.index === index);
+        if (errors.length > 0) {
+          row.settingEl.createDiv({ cls: "relation-sync-validation", text: errors.map((error) => error.message).join(" ") });
+        }
+      }
+    }
   }
 
-  private async setLocaleEnabled(locale: string, enabled: boolean, keepOthers: boolean): Promise<void> {
-    for (const pair of this.plugin.settings.relations) {
-      const matches = pairMatchesLocale(pair, locale) && getCategoryForKey(pair.forward) !== "custom";
-      if (matches) pair.enabled = enabled;
-      else if (!keepOthers) pair.enabled = false;
-    }
+  private async enablePreset(locale: string): Promise<void> {
+    const { relations, skipped } = enablePresetPairs(this.plugin.settings.relations, locale);
+    this.plugin.settings.relations = relations;
     await this.plugin.saveSettings();
+    if (skipped > 0) new Notice(t().presetConflicts(skipped));
     this.display();
   }
-
-  private async disableOtherLocales(locale: string): Promise<void> {
-    for (const pair of this.plugin.settings.relations) {
-      const isCustom = getCategoryForKey(pair.forward) === "custom";
-      if (!isCustom && !pairMatchesLocale(pair, locale)) pair.enabled = false;
-    }
-    await this.plugin.saveSettings();
-    this.display();
-  }
-
-  // ── Export pairs ──────────────────────────────────────────────────────
 
   private async exportPairs(): Promise<void> {
     const strings = t();
@@ -741,13 +546,9 @@ export class RelationSyncSettingTab extends PluginSettingTab {
           const text = await file.text();
           const parsed = JSON.parse(text) as unknown;
           if (!Array.isArray(parsed)) throw new Error("Not an array");
-          const pairs = parsed.filter(
-            (p): p is RelationPair =>
-              typeof p === "object" &&
-              p !== null &&
-              typeof (p as RelationPair).forward === "string" &&
-              typeof (p as RelationPair).inverse === "string",
-          );
+          if (!parsed.every(isRelationPair)) throw new Error("Invalid relation pair");
+          const pairs: RelationPair[] = parsed;
+
 
           // Merge: skip duplicates by forward+inverse key
           const existing = new Set(
@@ -766,6 +567,11 @@ export class RelationSyncSettingTab extends PluginSettingTab {
             } else {
               skipped++;
             }
+          }
+          const issues = validationIssues(this.plugin.settings.relations);
+          if (issues.length > 0) {
+            this.plugin.settings.relations.splice(this.plugin.settings.relations.length - added, added);
+            throw new Error("Conflicting import");
           }
           await this.plugin.saveSettings();
           new Notice(skipped > 0 ? strings.duplicateImportSkipped(added, skipped) : strings.importSuccess(added));

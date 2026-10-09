@@ -13,6 +13,8 @@ export interface RelationPair {
   inverse: string;
   /** When false the pair is skipped during sync. Defaults to true. */
   enabled?: boolean;
+  forwardAliases?: string[];
+  inverseAliases?: string[];
 }
 
 // ── Category IDs ─────────────────────────────────────────────────────────
@@ -29,6 +31,60 @@ export type CategoryId =
 // ── UI translation strings ──────────────────────────────────────────────
 
 export interface I18nStrings {
+  stateReady: string;
+  statePaused: string;
+  stateBlocked: string;
+  firstRunTitle: string;
+  firstRunDesc: string;
+  exampleSource: string;
+  exampleTarget: string;
+  exampleForward: string;
+  exampleInverse: string;
+  checkCurrentNote: string;
+  checkCurrentNoteDesc: string;
+  noActiveNote: string;
+  openSettings: string;
+  relationsHeading: string;
+  advancedHeading: string;
+  editPair: string;
+  savePair: string;
+  pairEnabled: string;
+  forwardLabel: string;
+  inverseLabel: string;
+  forwardAliasesLabel: string;
+  inverseAliasesLabel: string;
+  aliasesDesc: string;
+  aliasesPlaceholder: string;
+  activePairs: (active: number, total: number) => string;
+  logAdded: string;
+  logRemoved: string;
+  syncBusy: string;
+  previewChanged: string;
+  writeError: (file: string, message: string) => string;
+  syncResult: (scanned: number, changed: number, changes: number, failed: number) => string;
+  problemsHeading: string;
+  problemMissing: string;
+  problemExcluded: string;
+  problemValue: string;
+  problemInvalid: string;
+  undoSessionDesc: string;
+  settingsMigrated: string;
+  languageFilter: string;
+  allLanguages: string;
+  languagePresets: string;
+  languagePresetsDesc: string;
+  enableEnglish: string;
+  enableItalian: string;
+  presetConflicts: (count: number) => string;
+  panelCheck: string;
+  panelConfigured: string;
+  panelMissing: string;
+  panelExcluded: string;
+  panelReciprocal: string;
+  panelUnpaired: string;
+  undoPreviewTitle: string;
+  undoChanges: (count: number) => string;
+
   // ── Header
   pluginTitle: string;
   pluginDescription: string;
@@ -43,7 +99,6 @@ export interface I18nStrings {
   syncVault: string;
   syncVaultDesc: string;
   syncVaultButton: string;
-  syncNotice: (count: number) => string;
   bulkSyncRunningNotice: string;
   bulkSyncFailedNotice: string;
   bulkPreviewTitle: string;
@@ -68,9 +123,7 @@ export interface I18nStrings {
   viewRecentLogDesc: string;
   viewRecentLogButton: string;
   undoLastSync: string;
-  undoLastSyncDesc: string;
   undoLastSyncButton: string;
-  undoLastSyncConfirm: string;
   undoLastSyncNotice: (count: number) => string;
   noUndoAvailable: string;
   configInvalidTitle: string;
@@ -112,8 +165,6 @@ export interface I18nStrings {
   addPairButton: string;
 
   // ── Count labels
-  pairsTotal: (count: number) => string;
-  pairsShown: (visible: number, total: number) => string;
 
   // ── Pair row
   forwardPlaceholder: string;
@@ -121,7 +172,6 @@ export interface I18nStrings {
   removePairTooltip: string;
   togglePairTooltip: string;
   validationEmptyField: string;
-  validationSameField: string;
   validationDuplicatePair: string;
   validationConflictingKey: (key: string) => string;
 
@@ -130,14 +180,6 @@ export interface I18nStrings {
   noRelations: string;
 
   // ── Language filter toggle
-  showAllLanguages: string;
-  showAllLanguagesDesc: string;
-  enableVisibleCategory: string;
-  disableVisibleCategory: string;
-  enableCurrentLanguage: string;
-  enableCurrentLanguageDesc: string;
-  disableOtherLanguages: string;
-  disableOtherLanguagesDesc: string;
   duplicateImportSkipped: (added: number, skipped: number) => string;
 
   // ── Category labels
@@ -160,7 +202,7 @@ export interface I18nStrings {
  * fill in `strings`, and list the relation pairs grouped by category.
  */
 export interface LocaleDefinition {
-  /** ISO 639-1 code, e.g. "en", "it", "es". */
+  /** ISO 639-1 code, "en" or "it". */
   code: string;
 
   /** UI strings for settings and notices. */

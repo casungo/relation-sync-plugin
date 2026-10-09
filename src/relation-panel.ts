@@ -2,6 +2,8 @@ import { ItemView, TFile, type WorkspaceLeaf } from "obsidian";
 import type RelationSyncPlugin from "./main";
 import { t } from "./locales";
 import { parseWikiLinks } from "./utils";
+import { buildRelationMap } from "./relation-map";
+import { showSyncPreview } from "./settings-tab";
 
 export const RELATION_PANEL_VIEW_TYPE = "relation-sync-panel";
 
@@ -62,21 +64,28 @@ export class RelationPanelView extends ItemView {
       cls: "relation-sync-panel-title",
     });
 
+    const state = this.plugin.engine.getState();
+    contentEl.createDiv({ cls: "relation-sync-status", text: state === "ready" ? strings.stateReady : state === "paused" ? strings.statePaused : strings.stateBlocked });
+    const settingsButton = contentEl.createEl("button", { text: strings.panelConfigured });
+    settingsButton.addEventListener("click", () => this.plugin.openSettings());
     if (!(file instanceof TFile)) {
       this.renderEmpty(strings.relationsPanelNoFile);
       return;
     }
 
+    contentEl.createEl("p", { text: file.path, cls: "relation-sync-panel-note" });
+    const checkButton = contentEl.createEl("button", { text: strings.panelCheck });
+    checkButton.addEventListener("click", () => showSyncPreview(this.app, this.plugin.engine, file));
     const cache = this.app.metadataCache.getFileCache(file);
     const frontmatter = cache?.frontmatter;
     if (!frontmatter) {
-      this.renderEmpty(strings.relationsPanelNoFrontmatter);
+      this.renderEmpty(`${strings.relationsPanelNoFrontmatter} ${strings.firstRunDesc}`);
       return;
     }
 
     const groups = this.getGroupedRelations(file, frontmatter);
     if (groups.length === 0) {
-      this.renderEmpty(strings.relationsPanelNoRelations);
+      this.renderEmpty(`${strings.relationsPanelNoRelations} ${strings.aliasesDesc}`);
       return;
     }
 
@@ -102,12 +111,7 @@ export class RelationPanelView extends ItemView {
     sourceFile: TFile,
     frontmatter: Record<string, unknown>,
   ): GroupedRelation[] {
-    const enabledRelationKeys = new Set<string>();
-    for (const pair of this.plugin.settings.relations) {
-      if (pair.enabled === false) continue;
-      enabledRelationKeys.add(pair.forward.toLowerCase());
-      enabledRelationKeys.add(pair.inverse.toLowerCase());
-    }
+    const enabledRelationKeys = buildRelationMap(this.plugin.settings.relations);
 
     const groups = new Map<string, GroupedRelation>();
     for (const rawKey of Object.keys(frontmatter)) {
@@ -144,6 +148,12 @@ export class RelationPanelView extends ItemView {
       cls: "relation-sync-panel-link",
     });
     linkEl.type = "button";
+    const states = group.relations.map((key) => this.plugin.engine.getLinkState(sourceFile, key, group.linkText));
+    const state = states.find((value) => value !== "reciprocal") ?? "reciprocal";
+    linkEl.disabled = state === "missing" || state === "invalid";
+    itemEl.createDiv({ cls: "relation-sync-link-state", text: state === "missing" ? strings.panelMissing :
+      state === "invalid" ? strings.problemInvalid : state === "excluded" ? strings.panelExcluded :
+      state === "reciprocal" ? strings.panelReciprocal : strings.panelUnpaired });
     linkEl.title = strings.relationsPanelOpenNoteTooltip;
     linkEl.addEventListener("click", () => {
       void this.app.workspace.openLinkText(group.linkText, sourceFile.path);

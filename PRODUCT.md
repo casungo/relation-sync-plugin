@@ -1,52 +1,17 @@
-# PRD — Relation Sync for Obsidian
-
-Audit date: 2026-08-12
-Status: released Obsidian plugin; compatibility evidence from current vaults is not measured here.
+# Relation Sync
 
 ## Intent
 
-- Target users: Obsidian users who keep related notes in YAML frontmatter and want inverse links maintained safely.
-- Core job: define relation pairs, synchronize existing notes bidirectionally, preview changes, and undo the latest batch without hand-editing every backlink.
-- Non-goals: modifying note bodies, inventing missing notes, cloud vault synchronization, or a generic graph database.
+Maintain inverse frontmatter links between existing Obsidian notes while preserving unrelated properties and note bodies. The first successful use should be a preview on two notes, followed by explicit activation of automatic sync.
 
-## Current maturity
+## Supported languages and roles
 
-### Shipped or verified in the repository
+English and Italian are the supported interface languages and preset catalogs. Both property vocabularies are available independently of the interface language. Synonyms identify the same role; generated inverses use neutral canonical names and never infer a person's gender. Existing synonyms are preserved.
 
-Version `1.1.6` documents automatic inverse sync, 50+ defaults, custom pairs, single/array values, bulk sync, eight locales, searchable settings, first-run backup/preview/log, pause behavior, and in-memory undo. Tests, lint, and build scripts are present.
+Italian kinship names with ambiguous meanings require explicit roles, such as `nipoti di nonni` and `nipoti di zii`. Legacy source-role phrases ending in `of` or `di` retain their direction through aliases.
 
-### Real-use evidence
+## Safety and verification
 
-The plugin repository, manifest, release metadata, and behavior tests are present. No current Obsidian version/vault compatibility session was run, so real-user safety and upgrade behavior remain unverified.
+New installations start paused. Manual sync previews missing inverses and preserves existing relations. Pair editing validates a draft before saving. Settings migration retires exact stock presets from other languages while preserving custom mappings and safety settings. Undo is limited to the latest link-write batch in the current plugin session; renames are outside that batch.
 
-## Work state
-
-- Completed: core relation model, conservative existing-note boundaries, settings, bulk sync, and release path.
-- Active: compatibility maintenance and feedback from real vaults.
-- Blocked: no repository blocker observed; current Obsidian API/vault diversity needs evidence.
-- Frozen/undecided: adding more default relation pairs is lower priority than safe sync/undo compatibility.
-
-## Next action / owner decision
-
-Collect compatibility reports from current Obsidian versions and representative vaults, prioritizing sync/preview/undo behavior over more defaults.
-
-## Anti-slop audit
-
-### Text
-
-Finding: the README leads with generic marketing adjectives and emoji-heavy labels: “powerful,” “Stop manually,” “Extensive Default Library,” and “Modern Settings UI.” Evidence: [README.md](README.md#L1-L18). Impact: weakens technical credibility and hides the safety model beneath promotional language. Confidence: 90%. Suggested remediation: replace the claims with factual behavior and keep the existing safe first-run/undo explanation as the lead.
-
-### Code
-
-No confirmed anti-slop code defect at the threshold. The plugin’s existing-note and undo boundaries are purposeful.
-
-### Design
-
-Not applicable to a verified browser UI; settings UI is implemented in the plugin but was not visually audited in a running Obsidian host.
-
-## Evidence sources
-
-- [README.md](README.md)
-- [AGENTS.md](AGENTS.md)
-- [CONTRIBUTING.md](CONTRIBUTING.md)
-- `main.js`, `styles.css`, `data.json`, `test/` or test scripts, and `manifest.json`
+Tests cover the sync engine, presets, settings migration, parsing and frontmatter operations. Visual checks and representative Obsidian vault flows remain separate verification gates. `plans/usability-report-2026-10-08.md` records the earlier audit against commit `249eb6a`; its findings describe that snapshot.

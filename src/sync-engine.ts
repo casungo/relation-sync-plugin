@@ -5,9 +5,9 @@ import { validateRelationPairs } from "./validation";
 import {
   addInverseToFrontmatter,
   findActualKey,
-  getExistingStringValues,
   removeInverseFromFrontmatter,
 } from "./frontmatter-ops";
+import { t } from "./locales";
 import { isExcludedPath } from "./path-rules";
 import {
   debounce,
@@ -35,7 +35,15 @@ export interface SyncLogEntry {
   link: string;
 }
 
+export interface SyncProblem {
+  file: string;
+  key: string;
+  link: string;
+  reason: "missing" | "excluded" | "invalid" | "value";
+}
+
 export interface BulkSyncPlan {
+  problems: SyncProblem[];
   filesScanned: number;
   entries: SyncLogEntry[];
   filesToChange: number;
@@ -88,6 +96,8 @@ export class SyncEngine {
 
   /** Whether a bulk sync is currently running (for cancellation). */
   private bulkSyncAbort = false;
+  private bulkSyncRunning = false;
+  private writeFailures = 0;
 
   /** Log entries from the most recent operation. */
   private syncLog: SyncLogEntry[] = [];
@@ -118,31 +128,69 @@ export class SyncEngine {
     this.relationMap = this.createValidatedRelationMap(settings);
   }
 
+  getState(): "paused" | "blocked" | "ready" {
+    if (this.relationMap.size === 0) return "blocked";
+    return this.settings.syncEnabled ? "ready" : "paused";
+  }
+
+  getUndoBatch(): SyncLogEntry[] { return [...this.lastUndoBatch]; }
+
+  getLinkState(source: TFile, key: string, link: string): "missing" | "excluded" | "invalid" | "reciprocal" | "unpaired" {
+    const target = this.app.metadataCache.getFirstLinkpathDest(link, source.path);
+    if (!(target instanceof TFile)) return "missing";
+    if (target.extension !== "md") return "invalid";
+    if (this.isExcluded(source.path) || this.isExcluded(target.path)) return "excluded";
+    const inverse = this.relationMap.get(key.toLowerCase());
+    const fm = this.app.metadataCache.getFileCache(target)?.frontmatter ?? {};
+    return inverse && this.hasEquivalentLink(fm, inverse, this.makeLinkToFile(source, target.path), target.path) ? "reciprocal" : "unpaired";
+  }
+
   /** Take a snapshot of every markdown file's frontmatter. */
-  snapshotVault(): void {
+  snapshotVault(skipQueued = false): void {
     for (const file of this.app.vault.getMarkdownFiles()) {
+      if (skipQueued && this.pendingQueue.some((item) => item.file.path === file.path)) continue;
       const cache = this.app.metadataCache.getFileCache(file);
-      if (cache?.frontmatter) {
-        this.prevFm.set(file.path, { ...cache.frontmatter });
-      }
+      this.prevFm.set(file.path, structuredClone(cache?.frontmatter ?? {}));
     }
   }
 
   /** Handle a metadata-cache change event (debounced). */
   handleMetaChanged(file: TFile, cache: CachedMetadata): void {
     if (!this.settings.syncEnabled) {
-      this.prevFm.set(file.path, { ...(cache.frontmatter ?? {}) });
+      this.prevFm.set(file.path, structuredClone(cache.frontmatter ?? {}));
       return;
     }
 
     // Skip our own writes — clear the guard flag when we see its echo.
     if (this.writing.has(file.path)) {
       this.clearWritingGuard(file.path);
-      this.prevFm.set(file.path, { ...(cache.frontmatter ?? {}) });
+      this.prevFm.set(file.path, structuredClone(cache.frontmatter ?? {}));
       return;
     }
 
-    this.pendingQueue.push({ file, cache });
+    // A newly indexed target may resolve links that were previously missing.
+    if (!this.prevFm.has(file.path)) {
+      for (const source of this.app.vault.getMarkdownFiles()) {
+        if (source.path === file.path || this.isExcluded(source.path)) continue;
+        const sourceCache = this.app.metadataCache.getFileCache(source);
+        if (sourceCache?.frontmatter && Object.entries(sourceCache.frontmatter).some(([key, value]) =>
+          this.relationMap.has(key.toLowerCase()) && parseWikiLinks(value).some((link) =>
+            this.app.metadataCache.getFirstLinkpathDest(link, source.path)?.path === file.path),
+          )) {
+          this.pendingQueue.push({ file: source, cache: structuredClone(sourceCache) });
+          // Only the previously unresolved links need to be reconsidered.
+          const previous = structuredClone(this.prevFm.get(source.path) ?? {});
+          for (const key of Object.keys(previous)) {
+            if (!this.relationMap.has(key.toLowerCase())) continue;
+            const values = Array.isArray(previous[key]) ? previous[key] as unknown[] : [previous[key]];
+            previous[key] = values.filter((value) => !parseWikiLinks(value).some((link) =>
+              this.app.metadataCache.getFirstLinkpathDest(link, source.path)?.path === file.path));
+          }
+          this.prevFm.set(source.path, previous);
+        }
+      }
+    }
+    this.pendingQueue.push({ file, cache: structuredClone(cache) });
     this.debouncedFlush();
   }
 
@@ -156,7 +204,7 @@ export class SyncEngine {
    * Updates all notes in the vault that reference the old name's link.
    */
   async handleFileRenamed(file: TFile, oldPath: string): Promise<void> {
-    if (!this.settings.syncEnabled) return;
+    if (!this.settings.syncEnabled || this.relationMap.size === 0) return;
 
     // Update our snapshot key
     const snap = this.prevFm.get(oldPath);
@@ -182,8 +230,8 @@ export class SyncEngine {
         const resolved = this.app.metadataCache.getFirstLinkpathDest(targetName, f.path);
         return !(resolved instanceof TFile) || resolved.path === file.path;
       };
-      const hasRef = Object.values(fm).some((value) =>
-        parseWikiLinks(value).some(shouldReplaceTarget),
+      const hasRef = Object.entries(fm).some(([key, value]) =>
+        this.relationMap.has(key.toLowerCase()) && parseWikiLinks(value).some(shouldReplaceTarget),
       );
       if (!hasRef) continue;
 
@@ -192,6 +240,7 @@ export class SyncEngine {
       try {
         await this.app.fileManager.processFrontMatter(f, (fmObj: Record<string, unknown>) => {
           for (const key of Object.keys(fmObj)) {
+            if (!this.relationMap.has(key.toLowerCase())) continue;
             const val = fmObj[key];
             if (typeof val === "string") {
               fmObj[key] = replaceWikiLinkTarget(val, oldLinkPath, newLinkPath, shouldReplaceTarget);
@@ -205,16 +254,17 @@ export class SyncEngine {
       } catch (err: unknown) {
         this.clearWritingGuard(f.path);
         const msg = err instanceof Error ? err.message : String(err);
-        new Notice(`RelationSync: error updating links in "${f.basename}" — ${msg}`);
+        new Notice(t().writeError(f.path, msg));
       }
     }
   }
 
   /** Compute the changes a full vault sync would apply. */
-  previewBulkSync(): BulkSyncPlan {
-    const planned = this.createBulkSyncPlan();
+  previewBulkSync(sourceFile?: TFile): BulkSyncPlan {
+    const planned = this.createBulkSyncPlan(sourceFile);
     const changedFiles = new Set(planned.entries.map((entry) => entry.file));
     return {
+      problems: planned.problems,
       filesScanned: planned.filesScanned,
       filesToChange: changedFiles.size,
       added: planned.entries.filter((entry) => entry.action === "added").length,
@@ -231,11 +281,19 @@ export class SyncEngine {
   /** Run a full vault sync — re-computes all inverse relations from scratch. */
   async runBulkSync(
     onProgress?: (progress: BulkSyncProgress) => void,
-  ): Promise<{ count: number; log: SyncLogEntry[]; cancelled: boolean }> {
+    sourceFile?: TFile,
+    reviewedPlan?: BulkSyncPlan,
+  ): Promise<{ count: number; scanned: number; failed: number; log: SyncLogEntry[]; cancelled: boolean }> {
+    if (this.flushing || this.bulkSyncRunning) throw new Error(t().syncBusy);
+    const preview = this.previewBulkSync(sourceFile);
+    if (reviewedPlan && JSON.stringify(preview) !== JSON.stringify(reviewedPlan)) throw new Error(t().previewChanged);
+    if (this.relationMap.size === 0) throw new Error(t().configInvalidDesc);
+    this.bulkSyncRunning = true;
+    this.writeFailures = 0;
     this.bulkSyncAbort = false;
     this.syncLog = [];
 
-    const plan = this.createBulkSyncPlan();
+    const plan = this.createBulkSyncPlan(sourceFile);
     const changesByFile = new Map<string, PlannedSyncChange[]>();
     for (const entry of plan.entries) {
       const source = this.app.vault.getAbstractFileByPath(entry.sourcePath);
@@ -246,24 +304,31 @@ export class SyncEngine {
     }
 
     this.beginBatch();
-    let filesChanged = 0;
-    let changesApplied = 0;
-    for (const [path, changes] of changesByFile) {
-      if (this.bulkSyncAbort) break;
-      const target = this.app.vault.getAbstractFileByPath(path);
-      if (!(target instanceof TFile)) continue;
-      await this.applyBulkChanges(target, changes);
-      filesChanged++;
-      changesApplied += changes.length;
-      onProgress?.({
-        filesChanged,
-        totalFilesToChange: changesByFile.size,
-        changesApplied,
-      });
+    try {
+      let filesChanged = 0;
+      let changesApplied = 0;
+      for (const [path, changes] of changesByFile) {
+        if (this.bulkSyncAbort) break;
+        const target = this.app.vault.getAbstractFileByPath(path);
+        if (!(target instanceof TFile)) continue;
+        const before = this.syncLog.length;
+        await this.applyBulkChanges(target, changes);
+        const applied = this.syncLog.length - before;
+        if (applied > 0) filesChanged++;
+        changesApplied += applied;
+        onProgress?.({
+          filesChanged,
+          totalFilesToChange: changesByFile.size,
+          changesApplied,
+        });
+      }
+      this.snapshotVault(true);
+      return { count: filesChanged, scanned: plan.filesScanned, failed: this.writeFailures, log: [...this.syncLog], cancelled: this.bulkSyncAbort };
+    } finally {
+      this.endBatch();
+      this.bulkSyncRunning = false;
+      if (this.pendingQueue.length > 0) this.debouncedFlush();
     }
-    this.endBatch();
-    this.snapshotVault();
-    return { count: plan.filesScanned, log: [...this.syncLog], cancelled: this.bulkSyncAbort };
   }
 
   /** Cancel an in-progress bulk sync. */
@@ -289,30 +354,38 @@ export class SyncEngine {
   }
 
   /** Reverse the most recent sync batch. */
-  async undoLastSync(): Promise<{ count: number; log: SyncLogEntry[] }> {
+  async undoLastSync(reviewedBatch?: SyncLogEntry[]): Promise<{ count: number; log: SyncLogEntry[] }> {
+    if (this.flushing || this.bulkSyncRunning) throw new Error(t().syncBusy);
+    if (reviewedBatch && JSON.stringify(reviewedBatch) !== JSON.stringify(this.lastUndoBatch)) throw new Error(t().previewChanged);
     const batch = [...this.lastUndoBatch].reverse();
     if (batch.length === 0) return { count: 0, log: [] };
 
-    const undoLog: SyncLogEntry[] = [];
-    const changesByFile = new Map<string, SyncLogEntry[]>();
-    for (const entry of batch) {
-      const changes = changesByFile.get(entry.file) ?? [];
-      changes.push(entry);
-      changesByFile.set(entry.file, changes);
-    }
+    this.bulkSyncRunning = true;
+    try {
+      const undoLog: SyncLogEntry[] = [];
+      const changesByFile = new Map<string, SyncLogEntry[]>();
+      for (const entry of batch) {
+        const changes = changesByFile.get(entry.file) ?? [];
+        changes.push(entry);
+        changesByFile.set(entry.file, changes);
+      }
 
-    for (const [path, changes] of changesByFile) {
-      const target = this.app.vault.getAbstractFileByPath(path);
-      if (!(target instanceof TFile)) continue;
-      await this.applyUndoChanges(target, changes, undoLog);
-    }
+      for (const [path, changes] of changesByFile) {
+        const target = this.app.vault.getAbstractFileByPath(path);
+        if (!(target instanceof TFile)) continue;
+        await this.applyUndoChanges(target, changes, undoLog);
+      }
 
-    this.lastUndoBatch = [];
-    this.syncLog = undoLog;
-    this.recentLog.unshift(...undoLog);
-    this.recentLog = this.recentLog.slice(0, 200);
-    this.snapshotVault();
-    return { count: undoLog.length, log: undoLog };
+      this.lastUndoBatch = [];
+      this.syncLog = undoLog;
+      this.recentLog.unshift(...undoLog);
+      this.recentLog = this.recentLog.slice(0, 200);
+      this.snapshotVault(true);
+      return { count: undoLog.length, log: undoLog };
+    } finally {
+      this.bulkSyncRunning = false;
+      if (this.pendingQueue.length > 0) this.debouncedFlush();
+    }
   }
 
   /** Clean up timers and state. */
@@ -357,7 +430,7 @@ export class SyncEngine {
   }
 
   private async flushQueue(): Promise<void> {
-    if (this.flushing) return;
+    if (this.flushing || this.bulkSyncRunning) return;
     this.flushing = true;
 
     try {
@@ -372,7 +445,10 @@ export class SyncEngine {
       }
 
       for (const { file, cache } of seen.values()) {
-        if (this.isExcluded(file.path)) continue;
+        if (this.isExcluded(file.path) || !this.settings.syncEnabled) {
+          this.prevFm.set(file.path, structuredClone(cache.frontmatter ?? {}));
+          continue;
+        }
         await this.processMetaChanged(file, cache);
       }
     } finally {
@@ -394,25 +470,22 @@ export class SyncEngine {
     this.beginBatch();
 
     try {
-      // Gather all keys that are known relation keys.
-      const allKeys = new Set([
-        ...Object.keys(fm).map((k) => k.toLowerCase()),
-        ...Object.keys(prev).map((k) => k.toLowerCase()),
-      ]);
-
-      for (const key of allKeys) {
-        const inverseKey = this.relationMap.get(key);
-        if (!inverseKey) continue;
-
-        // Find original casing in `fm` or `prev`
-        // We look for the exact string the user typed so we can reflect its casing
-        const originalKey = Object.keys(fm).find((k) => k.toLowerCase() === key) ?? 
-                            Object.keys(prev).find((k) => k.toLowerCase() === key) ?? key;
+      const groups = new Map<string, string[]>();
+      for (const rawKey of new Set([...Object.keys(fm), ...Object.keys(prev)])) {
+        const inverse = this.relationMap.get(rawKey.toLowerCase());
+        if (!inverse) continue;
+        const keys = groups.get(inverse) ?? [];
+        keys.push(rawKey);
+        groups.set(inverse, keys);
+      }
+      for (const [inverseKey, keys] of groups) {
+        const originalKey = keys.find((key) => key in fm) ?? keys[0] ?? inverseKey;
         const dynamicInverseKey = matchCasing(originalKey, inverseKey);
-
-        const cachedLinks = this.getLinksViaCache(cache, key);
-        const currentLinks = cachedLinks.length > 0 ? cachedLinks : this.getLinksFromRaw(fm, key);
-        const prevLinks = this.getLinksFromRaw(prev, key);
+        const currentLinks = [...new Set(keys.flatMap((key) => {
+          const cached = this.getLinksViaCache(cache, key.toLowerCase());
+          return cached.length > 0 ? cached : parseWikiLinks(fm[key]);
+        }))];
+        const prevLinks = [...new Set(keys.flatMap((key) => parseWikiLinks(prev[key])))];
 
         const added = currentLinks.filter(
           (l) => !prevLinks.some((p) => this.resolvedLinksEqual(l, p, file.path)),
@@ -430,7 +503,7 @@ export class SyncEngine {
       }
 
       // Update snapshot.
-      this.prevFm.set(file.path, { ...fm });
+      this.prevFm.set(file.path, structuredClone(fm));
     } finally {
       this.endBatch();
     }
@@ -480,11 +553,12 @@ export class SyncEngine {
     return linkTargetsEqual(a, b);
   }
 
-  private createBulkSyncPlan(): { filesScanned: number; entries: PlannedSyncChange[] } {
-    const files = this.app.vault.getMarkdownFiles().filter((file) => !this.isExcluded(file.path));
+  private createBulkSyncPlan(sourceFile?: TFile): { filesScanned: number; entries: PlannedSyncChange[]; problems: SyncProblem[] } {
+    const files = (sourceFile ? [sourceFile] : this.app.vault.getMarkdownFiles()).filter((file) => !this.isExcluded(file.path));
+    const problems: SyncProblem[] = [];
     const entries: PlannedSyncChange[] = [];
     const desired = new Map<string, Map<string, Map<string, PlannedSyncChange>>>();
-    let filesScanned = 0;
+    const filesScanned = files.length;
 
     const addDesired = (target: TFile, key: string, link: string, sourcePath: string): void => {
       const targetMap = desired.get(target.path) ?? new Map<string, Map<string, PlannedSyncChange>>();
@@ -497,7 +571,6 @@ export class SyncEngine {
     for (const sourceFile of files) {
       const cache = this.app.metadataCache.getFileCache(sourceFile);
       if (!cache?.frontmatter) continue;
-      filesScanned++;
       const fm = cache.frontmatter;
 
       for (const rawKey of Object.keys(fm)) {
@@ -509,31 +582,11 @@ export class SyncEngine {
         const links = currentLinks.length > 0 ? currentLinks : this.getLinksFromRaw(fm, key);
         for (const targetName of links) {
           const target = this.app.metadataCache.getFirstLinkpathDest(targetName, sourceFile.path);
-          if (!(target instanceof TFile)) continue;
-          if (this.isExcluded(target.path)) continue;
+          if (!(target instanceof TFile) || target.extension !== "md" || this.isExcluded(target.path)) {
+            problems.push({ file: sourceFile.path, key: rawKey, link: targetName, reason: !target ? "missing" : this.isExcluded(target.path) ? "excluded" : "invalid" });
+            continue;
+          }
           addDesired(target, dynamicInverseKey, this.makeLinkToFile(sourceFile, target.path), sourceFile.path);
-        }
-      }
-    }
-
-    for (const targetFile of files) {
-      const cache = this.app.metadataCache.getFileCache(targetFile);
-      const fm = cache?.frontmatter;
-      if (!fm) continue;
-      for (const rawKey of Object.keys(fm)) {
-        const key = rawKey.toLowerCase();
-        if (!this.relationMap.has(key)) continue;
-        const existingLinks = this.getLinksViaCache(cache, key);
-        const links = existingLinks.length > 0 ? existingLinks : this.getLinksFromRaw(fm, key);
-          const existingValues = getExistingStringValues(fm[rawKey]);
-        for (const linkTarget of links) {
-          const source = this.app.metadataCache.getFirstLinkpathDest(linkTarget, targetFile.path);
-          if (!(source instanceof TFile)) continue;
-          if (this.isExcluded(source.path)) continue;
-          const desiredForSource = desired.get(targetFile.path)?.get(key)?.get(source.path);
-          if (desiredForSource) continue;
-          const link = existingValues.find((value) => linkTargetsEqual(value, linkTarget)) ?? toWikiLink(linkTarget);
-          entries.push({ file: targetFile.path, action: "removed", key: rawKey, link, sourcePath: source.path });
         }
       }
     }
@@ -545,11 +598,13 @@ export class SyncEngine {
           if (!(target instanceof TFile)) continue;
           const cache = this.app.metadataCache.getFileCache(target);
           const fm = cache?.frontmatter ?? {};
+          const alreadyPresent = this.hasEquivalentLink(fm, change.key, change.link, target.path);
           const actualKey = findActualKey(fm, change.key);
-          const existingLinks = actualKey ? parseWikiLinks(fm[actualKey]) : [];
-          const alreadyPresent = existingLinks.some((value) =>
-            this.resolvedLinksEqual(value, change.link, target.path),
-          );
+          const value = actualKey ? fm[actualKey] : undefined;
+          if (!alreadyPresent && value != null && typeof value !== "string" && !Array.isArray(value)) {
+            problems.push({ file: target.path, key: actualKey ?? change.key, link: change.link, reason: "value" });
+            continue;
+          }
           if (!alreadyPresent) entries.push(change);
         }
       }
@@ -561,7 +616,18 @@ export class SyncEngine {
       a.action.localeCompare(b.action) ||
       a.link.localeCompare(b.link),
     );
-    return { filesScanned, entries };
+    return { filesScanned, entries, problems };
+  }
+
+  private equivalentKeys(fm: Record<string, unknown>, key: string): string[] {
+    const inverse = this.relationMap.get(key.toLowerCase());
+    return Object.keys(fm).filter((candidate) => candidate.toLowerCase() === key.toLowerCase() ||
+      (inverse !== undefined && this.relationMap.get(candidate.toLowerCase()) === inverse));
+  }
+
+  private hasEquivalentLink(fm: Record<string, unknown>, key: string, link: string, sourcePath: string): boolean {
+    return this.equivalentKeys(fm, key).some((candidate) =>
+      parseWikiLinks(fm[candidate]).some((value) => this.resolvedLinksEqual(value, link, sourcePath)));
   }
 
   private makeLinkToFile(file: TFile, sourcePath: string): string {
@@ -578,7 +644,7 @@ export class SyncEngine {
       targetName,
       sourceFile.path,
     );
-    if (!(target instanceof TFile)) return;
+    if (!(target instanceof TFile) || target.extension !== "md") return;
     if (this.isExcluded(target.path)) return;
 
     const sourceLink = this.makeLinkToFile(sourceFile, target.path);
@@ -598,14 +664,18 @@ export class SyncEngine {
       await this.app.fileManager.processFrontMatter(
         target,
         (fm: Record<string, unknown>) => {
-          changed = addInverseToFrontmatter(fm, inverseKey, sourceLink);
+          if (!this.hasEquivalentLink(fm, inverseKey, sourceLink, target.path)) {
+            changed = addInverseToFrontmatter(fm, inverseKey, sourceLink);
+          }
         },
       );
       if (changed) this.recordChange({ file: target.path, action: "added", key: inverseKey, link: sourceLink });
+      else this.clearWritingGuard(target.path);
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
-      new Notice(`RelationSync: error updating "${target.basename}" — ${msg}`);
+      this.writeFailures++;
+      new Notice(t().writeError(target.path, msg));
     }
   }
 
@@ -618,7 +688,7 @@ export class SyncEngine {
       targetName,
       sourceFile.path,
     );
-    if (!(target instanceof TFile)) return;
+    if (!(target instanceof TFile) || target.extension !== "md") return;
     if (this.isExcluded(target.path)) return;
 
     const sourceLink = this.makeLinkToFile(sourceFile, target.path);
@@ -634,18 +704,23 @@ export class SyncEngine {
     this.setWritingGuardTimer(target.path);
 
     try {
-      let changed = false;
-      await this.app.fileManager.processFrontMatter(
-        target,
-        (fm: Record<string, unknown>) => {
-          changed = removeInverseFromFrontmatter(fm, inverseKey, sourceLink);
-        },
-      );
-      if (changed) this.recordChange({ file: target.path, action: "removed", key: inverseKey, link: sourceLink });
+      const removed: SyncLogEntry[] = [];
+      await this.app.fileManager.processFrontMatter(target, (fm: Record<string, unknown>) => {
+        for (const key of this.equivalentKeys(fm, inverseKey)) {
+          const values = Array.isArray(fm[key]) ? fm[key] as unknown[] : [fm[key]];
+          for (const value of values) {
+            if (typeof value !== "string" || !parseWikiLinks(value).some((link) => this.resolvedLinksEqual(link, sourceLink, target.path))) continue;
+            if (removeInverseFromFrontmatter(fm, key, value)) removed.push({ file: target.path, action: "removed", key, link: value });
+          }
+        }
+      });
+      for (const entry of removed) this.recordChange(entry);
+      if (removed.length === 0) this.clearWritingGuard(target.path);
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
-      new Notice(`RelationSync: error updating "${target.basename}" — ${msg}`);
+      this.writeFailures++;
+      new Notice(t().writeError(target.path, msg));
     }
   }
 
@@ -659,9 +734,8 @@ export class SyncEngine {
         target,
         (fm: Record<string, unknown>) => {
           for (const change of changes) {
-            const changed = change.action === "added"
-              ? addInverseToFrontmatter(fm, change.key, change.link)
-              : removeInverseFromFrontmatter(fm, change.key, change.link);
+            const changed = !this.hasEquivalentLink(fm, change.key, change.link, target.path) &&
+              addInverseToFrontmatter(fm, change.key, change.link);
             if (changed) applied.push(change);
           }
         },
@@ -674,10 +748,12 @@ export class SyncEngine {
           link: change.link,
         });
       }
+      if (applied.length === 0) this.clearWritingGuard(target.path);
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
-      new Notice(`RelationSync: error updating "${target.basename}" — ${msg}`);
+      this.writeFailures++;
+      new Notice(t().writeError(target.path, msg));
     }
   }
 
@@ -734,14 +810,14 @@ export class SyncEngine {
     } catch (err: unknown) {
       this.clearWritingGuard(target.path);
       const msg = err instanceof Error ? err.message : String(err);
-      new Notice(`RelationSync: error undoing changes in "${target.basename}" — ${msg}`);
+      new Notice(t().writeError(target.path, msg));
     }
   }
 
   private createValidatedRelationMap(settings: RelationSyncSettings): Map<string, string> {
     const issues = validateRelationPairs(settings.relations, {
       emptyField: "empty",
-      sameField: "same",
+
       duplicatePair: "duplicate",
       conflictingKey: () => "conflict",
     });

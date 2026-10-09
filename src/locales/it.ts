@@ -10,26 +10,76 @@ export const it: LocaleDefinition = {
 
   // ── Stringhe UI ────────────────────────────────────────────────────────
   strings: {
+    stateReady: "Sincronizzazione automatica attiva",
+    statePaused: "Sincronizzazione automatica in pausa",
+    stateBlocked: "Sincronizzazione bloccata: controlla le coppie abilitate",
+    firstRunTitle: "Inizia con due note",
+    firstRunDesc: "I nomi delle proprietà descrivono la persona collegata. Crea entrambe le note, aggiungi un wiki link tra virgolette in una proprietà e controlla l'anteprima della nota corrente prima di attivare la sincronizzazione automatica.",
+    exampleSource: "Luca.md",
+    exampleTarget: "Maria.md",
+    exampleForward: "madre",
+    exampleInverse: "figli",
+    checkCurrentNote: "Anteprima nota corrente",
+    checkCurrentNoteDesc: "Completa gli inversi mancanti per questa nota. L'anteprima elenca anche le destinazioni mancanti ed escluse. Questa azione manuale funziona anche con la sincronizzazione automatica in pausa.",
+    noActiveNote: "Apri prima una nota Markdown.",
+    openSettings: "Apri impostazioni",
+    relationsHeading: "Coppie di relazioni",
+    advancedHeading: "Strumenti del vault e predefiniti",
+    editPair: "Modifica coppia",
+    savePair: "Salva coppia",
+    pairEnabled: "Abilita questa coppia",
+    forwardLabel: "Proprietà nella nota di origine",
+    inverseLabel: "Proprietà da aggiungere nella nota collegata",
+    forwardAliasesLabel: "Altri nomi della proprietà di origine",
+    inverseAliasesLabel: "Altri nomi della proprietà inversa",
+    aliasesDesc: "Sinonimi separati da virgole. Gli inversi usano il nome principale; i sinonimi già presenti vengono conservati.",
+    aliasesPlaceholder: "madre, mamma, padre, papà, babbo",
+    activePairs: (active, total) => `${active} attive / ${total} coppie`,
+    logAdded: "Aggiunto",
+    logRemoved: "Rimosso",
+    syncBusy: "Una sincronizzazione è già in corso. Attendi che finisca.",
+    previewChanged: "Le note o la configurazione sono cambiate dopo l'anteprima. Controlla una nuova anteprima prima di applicare.",
+    writeError: (file, message) => `Relation Sync: impossibile aggiornare ${file}: ${message}`,
+    syncResult: (scanned, changed, changes, failed) => `Lette ${scanned} note; modificate ${changed} note; applicate ${changes} modifiche; ${failed} errori di scrittura.`,
+    problemsHeading: "Collegamenti che non possono essere sincronizzati",
+    problemMissing: "La nota di destinazione non esiste",
+    problemExcluded: "La nota di destinazione è esclusa",
+    problemValue: "La proprietà inversa ha un valore non supportato; usa un wiki link o una lista.",
+    problemInvalid: "La destinazione non è una nota Markdown",
+    undoSessionDesc: "Puoi annullare solo l'ultimo gruppo di scritture di questa sessione. Una nuova sincronizzazione con modifiche lo sostituisce; riavviare Obsidian lo cancella. Le rinomine non sono incluse.",
+    settingsMigrated: "Relation Sync ora usa predefiniti inglesi e italiani con inversi neutri. Coppie personalizzate, sincronizzazione automatica ed esclusioni sono state conservate. Controlla le coppie aggiornate prima di sincronizzare.",
+    languageFilter: "Lingua delle proprietà",
+    allLanguages: "Inglese e italiano",
+    languagePresets: "Abilita un set predefinito",
+    languagePresetsDesc: "Aggiunge le coppie compatibili senza sostituire le associazioni personalizzate. La lingua delle proprietà è indipendente da quella dell'interfaccia.",
+    enableEnglish: "Abilita coppie inglesi",
+    enableItalian: "Abilita coppie italiane",
+    presetConflicts: (count) => `${count} coppie incompatibili sono rimaste disabilitate. Controlla i nomi delle proprietà.`,
+    panelCheck: "Controlla i collegamenti inversi",
+    panelConfigured: "Configura le coppie",
+    panelMissing: "Nota mancante",
+    panelExcluded: "Nota esclusa",
+    panelReciprocal: "Inverso presente",
+    panelUnpaired: "Inverso mancante",
+    undoPreviewTitle: "Modifiche da annullare",
+    undoChanges: (count) => `Annulla ${count} modifiche registrate. Controlla l’elenco prima di continuare.`,
+
     pluginTitle: "Relation Sync",
     pluginDescription:
-      "Definisci coppie di relazioni inverse. Quando scrivi " +
-      '"diretto: [[Destinazione]]" nel frontmatter di una nota, il plugin ' +
-      'aggiunge automaticamente "inverso: [[Origine]]" nel frontmatter della nota di destinazione.',
+      "Mantiene i collegamenti inversi tra le proprietà delle note. I sinonimi italiani e inglesi usano ruoli neutri, senza dedurre il genere.",
 
-    resetToDefaults: "Ripristina predefiniti",
+    resetToDefaults: "Ripristina coppie predefinite",
     resetToDefaultsDesc:
-      "Elimina tutte le modifiche personalizzate e ripristina il set di relazioni predefinito.",
-    resetToDefaultsButton: "Ripristina predefiniti",
+      "Sostituisce solo le coppie. Sincronizzazione automatica e percorsi esclusi restano invariati.",
+    resetToDefaultsButton: "Ripristina coppie predefinite",
     resetConfirm:
-      "Questo sostituirà TUTTE le tue relazioni attuali con quelle predefinite.\n\nContinuare?",
+      "Sostituire tutte le coppie, comprese quelle personalizzate? Sincronizzazione automatica ed esclusioni restano invariate. Nessuna proprietà delle note verrà eliminata.",
     resetNotice: "RelationSync: relazioni ripristinate ai predefiniti.",
 
     syncVault: "Sincronizza l'intero vault",
     syncVaultDesc:
-      "Ricalcola e aggiunge tutte le relazioni inverse in ogni file del vault.",
+      "Mostra un'anteprima e aggiunge gli inversi mancanti. Conserva le relazioni esistenti; questa azione manuale funziona anche con l'automatismo in pausa.",
     syncVaultButton: "Avvia sincronizzazione globale",
-    syncNotice: (count) =>
-      `RelationSync: sincronizzazione completata su ${count} note.`,
     bulkSyncRunningNotice: "RelationSync: sincronizzazione massiva in corso...",
     bulkSyncFailedNotice: "RelationSync: sincronizzazione massiva fallita.",
     bulkPreviewTitle: "Anteprima sincronizzazione massiva",
@@ -54,20 +104,16 @@ export const it: LocaleDefinition = {
     syncEnabledDesc:
       "Quando è disattivata, Relation Sync osserva le modifiche ma non scrive relazioni inverse.",
     viewRecentLog: "Log sincronizzazione recente",
-    viewRecentLogDesc: "Rivedi le ultime scritture automatiche e massive.",
+    viewRecentLogDesc: "Rivedi fino a 200 scritture di questa sessione, con i percorsi completi delle note.",
     viewRecentLogButton: "Vedi log",
     undoLastSync: "Annulla ultima sincronizzazione",
-    undoLastSyncDesc:
-      "Inverte l'ultimo gruppo di modifiche scritto da Relation Sync. Controlla il log dopo.",
     undoLastSyncButton: "Annulla ultima sincronizzazione",
-    undoLastSyncConfirm:
-      "Questo inverte l'ultimo gruppo di modifiche scritto da Relation Sync.\n\nContinuare?",
     undoLastSyncNotice: (count) =>
       `RelationSync: annullate ${count} modifiche di sincronizzazione.`,
     noUndoAvailable: "RelationSync: nessun gruppo di modifiche disponibile da annullare.",
     configInvalidTitle: "La configurazione richiede attenzione",
     configInvalidDesc:
-      "Le scritture automatiche sono disattivate finché le coppie abilitate vuote, duplicate o in conflitto non vengono corrette.",
+      "Correggi i nomi e i sinonimi vuoti o in conflitto prima di sincronizzare. Abilita almeno una coppia valida.",
     bulkProgress: (filesDone, filesTotal, changes) =>
       `RelationSync: sincronizzati ${filesDone}/${filesTotal} file (${changes} modifiche applicate).`,
     bulkSyncCancelledNotice: (changes) =>
@@ -106,15 +152,11 @@ export const it: LocaleDefinition = {
 
     addPairButton: "+ Aggiungi coppia",
 
-    pairsTotal: (count) => `${count} coppie in totale`,
-    pairsShown: (visible, total) => `${visible} / ${total} coppie mostrate`,
-
-    forwardPlaceholder: "diretto (es. amico di)",
-    inversePlaceholder: "inverso (es. amico di)",
+    forwardPlaceholder: "genitore",
+    inversePlaceholder: "figli",
     removePairTooltip: "Rimuovi questa coppia",
     togglePairTooltip: "Abilita / disabilita questa coppia",
     validationEmptyField: "Entrambi i campi relazione sono obbligatori.",
-    validationSameField: "Diretto e inverso non possono coincidere.",
     validationDuplicatePair: "Questa coppia di relazioni è duplicata.",
     validationConflictingKey: (key) =>
       `"${key}" è già gestita da un'altra coppia abilitata.`,
@@ -123,183 +165,275 @@ export const it: LocaleDefinition = {
     noRelations:
       'Nessuna relazione definita. Clicca "+ Aggiungi coppia" per crearne una.',
 
-    showAllLanguages: "Mostra tutte le lingue",
-    showAllLanguagesDesc:
-      "Quando disattivato, vengono mostrate solo le relazioni nella tua lingua. Attiva per vedere tutte.",
-    enableVisibleCategory: "Abilita categoria",
-    disableVisibleCategory: "Disabilita categoria",
-    enableCurrentLanguage: "Abilita questa lingua",
-    enableCurrentLanguageDesc:
-      "Attiva tutte le coppie integrate per la lingua corrente di Obsidian.",
-    disableOtherLanguages: "Disabilita altre lingue",
-    disableOtherLanguagesDesc:
-      "Mantiene attive le coppie personalizzate e la lingua corrente; disattiva gli altri pacchetti lingua.",
     duplicateImportSkipped: (added, skipped) =>
       `RelationSync: importate ${added} coppie; saltati ${skipped} duplicati.`,
 
-    catFamily: "👨‍👩‍👧‍👦 Famiglia",
-    catRomantic: "💕 Sentimentale",
-    catFriendship: "🤝 Amicizia e Sociale",
-    catProfessional: "💼 Professionale",
-    catEducation: "🎓 Istruzione",
-    catCreative: "🎨 Creativo",
-    catMisc: "🔗 Varie",
-    catCustom: "📦 Personalizzato",
+    catFamily: "Famiglia",
+    catRomantic: "Sentimentale",
+    catFriendship: "Amicizia e Sociale",
+    catProfessional: "Professionale",
+    catEducation: "Istruzione",
+    catCreative: "Creativo",
+    catMisc: "Varie",
+    catCustom: "Personalizzato",
   },
 
-  // ── Coppie di relazioni per categoria ──────────────────────────────────
   categories: {
     family: [
-      // Genitore / Figlio
-      { forward: "Figlio di", inverse: "Genitore di" },
-      { forward: "Figlia di", inverse: "Genitore di" },
-      { forward: "Genitore di", inverse: "Figlio di" },
-      { forward: "Padre di", inverse: "Figlio di" },
-      { forward: "Madre di", inverse: "Figlio di" },
-      { forward: "Figliastro di", inverse: "Patrigno di" },
-      { forward: "Figliastra di", inverse: "Matrigna di" },
-      { forward: "Patrigno di", inverse: "Figliastro di" },
-      { forward: "Matrigna di", inverse: "Figliastra di" },
-      { forward: "Figlio adottivo di", inverse: "Genitore adottivo di" },
-      { forward: "Genitore adottivo di", inverse: "Figlio adottivo di" },
-      // Coniugi e Partner
-      { forward: "Moglie di", inverse: "Marito di" },
-      { forward: "Marito di", inverse: "Moglie di" },
-      { forward: "Coniuge di", inverse: "Coniuge di" },
-      { forward: "Compagno di", inverse: "Compagna di" },
-      { forward: "Compagna di", inverse: "Compagno di" },
-      { forward: "Convivente di", inverse: "Convivente di" },
-      // Fratelli / Sorelle
-      { forward: "Fratello di", inverse: "Fratello di" },
-      { forward: "Sorella di", inverse: "Sorella di" },
-      { forward: "Fratellastro di", inverse: "Fratellastro di" },
-      { forward: "Sorellastra di", inverse: "Sorellastra di" },
-      { forward: "Gemello di", inverse: "Gemello di" },
-      { forward: "Gemella di", inverse: "Gemella di" },
-      // Nonni / Nipoti
-      { forward: "Nipote di", inverse: "Nonno di" },
-      { forward: "Nonno di", inverse: "Nipote di" },
-      { forward: "Nonna di", inverse: "Nipote di" },
-      { forward: "Bisnonno di", inverse: "Bisnipote di" },
-      { forward: "Bisnonna di", inverse: "Bisnipote di" },
-      { forward: "Bisnipote di", inverse: "Bisnonno di" },
-      // Zii / Cugini
-      { forward: "Zio di", inverse: "Nipote di" },
-      { forward: "Zia di", inverse: "Nipote di" },
-      { forward: "Cugino di", inverse: "Cugino di" },
-      { forward: "Cugina di", inverse: "Cugina di" },
-      // Suoceri / Cognati
-      { forward: "Suocero di", inverse: "Genero di" },
-      { forward: "Suocera di", inverse: "Nuora di" },
-      { forward: "Genero di", inverse: "Suocero di" },
-      { forward: "Nuora di", inverse: "Suocera di" },
-      { forward: "Cognato di", inverse: "Cognato di" },
-      { forward: "Cognata di", inverse: "Cognata di" },
-      // Padrini
-      { forward: "Padrino di", inverse: "Figlioccio di" },
-      { forward: "Madrina di", inverse: "Figlioccia di" },
-      { forward: "Figlioccio di", inverse: "Padrino di" },
-      { forward: "Figlioccia di", inverse: "Madrina di" },
+      {
+        forward: "genitore", inverse: "figli",
+        forwardAliases: ["genitori", "madre", "mamma", "mammà", "padre", "papà", "papa", "babbo", "Figlio di", "Figlia di"],
+        inverseAliases: ["figlio", "figlia", "figlie", "Genitore di", "Padre di", "Madre di"],
+      },
+      {
+        forward: "genitore acquisito", inverse: "figli acquisiti",
+        forwardAliases: ["patrigno", "matrigna", "Figliastro di", "Figliastra di"],
+        inverseAliases: ["figliastro", "figliastra", "Patrigno di", "Matrigna di"],
+      },
+      {
+        forward: "genitore adottivo", inverse: "figli adottivi",
+        forwardAliases: ["Figlio adottivo di"],
+        inverseAliases: ["Genitore adottivo di"],
+      },
+      {
+        forward: "coniuge", inverse: "coniuge",
+        forwardAliases: ["moglie", "marito", "Moglie di", "Marito di", "Coniuge di"],
+      },
+      {
+        forward: "fratelli e sorelle", inverse: "fratelli e sorelle",
+        forwardAliases: ["fratello", "sorella", "fratelli", "sorelle", "Fratello di", "Sorella di"],
+      },
+      {
+        forward: "fratelli e sorelle acquisiti", inverse: "fratelli e sorelle acquisiti",
+        forwardAliases: ["fratellastro", "sorellastra", "Fratellastro di", "Sorellastra di"],
+      },
+      {
+        forward: "gemelli", inverse: "gemelli",
+        forwardAliases: ["gemello", "gemella", "Gemello di", "Gemella di"],
+      },
+      {
+        forward: "nonni", inverse: "nipoti di nonni",
+        forwardAliases: ["nonno", "nonna", "Nipote di"],
+        inverseAliases: ["nipote di nonni", "Nonno di", "Nonna di"],
+      },
+      {
+        forward: "bisnonni", inverse: "pronipoti",
+        forwardAliases: ["bisnonno", "bisnonna", "Bisnipote di"],
+        inverseAliases: ["bisnipote", "Bisnonno di", "Bisnonna di"],
+      },
+      {
+        forward: "zii", inverse: "nipoti di zii",
+        forwardAliases: ["zio", "zia"],
+        inverseAliases: ["nipote di zii", "Zio di", "Zia di"],
+      },
+      {
+        forward: "cugini", inverse: "cugini",
+        forwardAliases: ["cugino", "cugina", "Cugino di", "Cugina di"],
+      },
+      {
+        forward: "suoceri", inverse: "generi e nuore",
+        forwardAliases: ["suocero", "suocera", "Genero di", "Nuora di"],
+        inverseAliases: ["genero", "nuora", "Suocero di", "Suocera di"],
+      },
+      {
+        forward: "cognati", inverse: "cognati",
+        forwardAliases: ["cognato", "cognata", "Cognato di", "Cognata di"],
+      },
+      {
+        forward: "genitore spirituale", inverse: "figli spirituali",
+        forwardAliases: ["padrino", "madrina", "Figlioccio di", "Figlioccia di"],
+        inverseAliases: ["figlioccio", "figlioccia", "Padrino di", "Madrina di"],
+      },
     ],
-
     romantic: [
-      { forward: "Fidanzato di", inverse: "Fidanzata di" },
-      { forward: "Fidanzata di", inverse: "Fidanzato di" },
-      { forward: "Ragazzo di", inverse: "Ragazza di" },
-      { forward: "Ragazza di", inverse: "Ragazzo di" },
-      { forward: "Ex di", inverse: "Ex di" },
-      { forward: "Ex ragazzo di", inverse: "Ex ragazza di" },
-      { forward: "Ex ragazza di", inverse: "Ex ragazzo di" },
-      { forward: "Ex fidanzato di", inverse: "Ex fidanzata di" },
-      { forward: "Ex fidanzata di", inverse: "Ex fidanzato di" },
-      { forward: "Ex marito di", inverse: "Ex moglie di" },
-      { forward: "Ex moglie di", inverse: "Ex marito di" },
-      { forward: "Cotta di", inverse: "Cotta di" },
-      { forward: "Amante di", inverse: "Amante di" },
-      { forward: "Innamorato di", inverse: "Amato da" },
-      { forward: "Amato da", inverse: "Innamorato di" },
-      { forward: "Spasimante di", inverse: "Corteggiato da" },
-      { forward: "Corteggiato da", inverse: "Spasimante di" },
-      { forward: "Frequenta", inverse: "Frequenta" },
-      { forward: "Promesso sposo di", inverse: "Promessa sposa di" },
-      { forward: "Promessa sposa di", inverse: "Promesso sposo di" },
+      {
+        forward: "relazione sentimentale", inverse: "relazione sentimentale",
+        forwardAliases: ["compagno", "compagna", "fidanzato", "fidanzata", "ragazzo", "ragazza", "Fidanzato di", "Fidanzata di", "Ragazzo di", "Ragazza di", "Compagno di", "Compagna di", "Convivente di"],
+      },
+      {
+        forward: "promessi sposi", inverse: "promessi sposi",
+        forwardAliases: ["Promesso sposo di", "Promessa sposa di"],
+      },
+      {
+        forward: "ex", inverse: "ex",
+        forwardAliases: ["Ex di", "Ex ragazzo di", "Ex ragazza di", "Ex fidanzato di", "Ex fidanzata di", "Ex marito di", "Ex moglie di"],
+      },
+      {
+        forward: "amante", inverse: "amante",
+        forwardAliases: ["Amante di"],
+      },
+      {
+        forward: "persona amata", inverse: "persona innamorata",
+        forwardAliases: ["cotta", "Innamorato di"],
+        inverseAliases: ["Amato da", "Cotta di"],
+      },
+      {
+        forward: "persona ammirata", inverse: "ammiratori",
+        forwardAliases: ["Spasimante di"],
+        inverseAliases: ["Corteggiato da"],
+      },
+      {
+        forward: "frequenta", inverse: "frequenta",
+      },
     ],
-
     friendship: [
-      { forward: "Amico di", inverse: "Amico di" },
-      { forward: "Amica di", inverse: "Amica di" },
-      { forward: "Migliore amico di", inverse: "Migliore amico di" },
-      { forward: "Migliore amica di", inverse: "Migliore amica di" },
-      { forward: "Amico d'infanzia di", inverse: "Amico d'infanzia di" },
-      { forward: "Conoscente di", inverse: "Conoscente di" },
-      { forward: "Vicino di", inverse: "Vicino di" },
-      { forward: "Vicina di", inverse: "Vicina di" },
-      { forward: "Coinquilino di", inverse: "Coinquilino di" },
-      { forward: "Coinquilina di", inverse: "Coinquilina di" },
-      { forward: "Alleato di", inverse: "Alleato di" },
-      { forward: "Nemico di", inverse: "Nemico di" },
-      { forward: "Rivale di", inverse: "Rivale di" },
+      {
+        forward: "amicizie", inverse: "amicizie",
+        forwardAliases: ["amico", "amica", "amici", "amiche", "Amico di", "Amica di"],
+      },
+      {
+        forward: "migliori amicizie", inverse: "migliori amicizie",
+        forwardAliases: ["Migliore amico di", "Migliore amica di"],
+      },
+      {
+        forward: "amicizie di infanzia", inverse: "amicizie di infanzia",
+        forwardAliases: ["Amico d'infanzia di"],
+      },
+      {
+        forward: "conoscenze", inverse: "conoscenze",
+        forwardAliases: ["conoscente", "Conoscente di"],
+      },
+      {
+        forward: "vicinato", inverse: "vicinato",
+        forwardAliases: ["vicino", "vicina", "Vicino di", "Vicina di"],
+      },
+      {
+        forward: "coinquilini", inverse: "coinquilini",
+        forwardAliases: ["coinquilino", "coinquilina", "Coinquilino di", "Coinquilina di"],
+      },
+      {
+        forward: "alleanze", inverse: "alleanze",
+        forwardAliases: ["alleato", "alleata", "Alleato di"],
+      },
+      {
+        forward: "inimicizie", inverse: "inimicizie",
+        forwardAliases: ["nemico", "nemica", "Nemico di"],
+      },
+      {
+        forward: "rivalità", inverse: "rivalità",
+        forwardAliases: ["rivale", "Rivale di"],
+      },
     ],
-
     professional: [
-      { forward: "Collega di", inverse: "Collega di" },
-      { forward: "Capo di", inverse: "Dipendente di" },
-      { forward: "Dipendente di", inverse: "Capo di" },
-      { forward: "Responsabile di", inverse: "Subordinato di" },
-      { forward: "Subordinato di", inverse: "Responsabile di" },
-      { forward: "Assistente di", inverse: "Assistito da" },
-      { forward: "Assistito da", inverse: "Assistente di" },
-      { forward: "Socio di", inverse: "Socio di" },
-      { forward: "Co-fondatore di", inverse: "Co-fondato da" },
-      { forward: "Co-fondato da", inverse: "Co-fondatore di" },
-      { forward: "Cliente di", inverse: "Fornitore di" },
-      { forward: "Fornitore di", inverse: "Cliente di" },
-      { forward: "Successore di", inverse: "Predecessore di" },
-      { forward: "Predecessore di", inverse: "Successore di" },
-      { forward: "Datore di lavoro di", inverse: "Lavoratore di" },
-      { forward: "Lavoratore di", inverse: "Datore di lavoro di" },
+      {
+        forward: "colleghi", inverse: "colleghi",
+        forwardAliases: ["collega", "Collega di"],
+      },
+      {
+        forward: "responsabile", inverse: "dipendenti",
+        forwardAliases: ["capo", "Dipendente di", "Subordinato di", "Lavoratore di"],
+        inverseAliases: ["dipendente", "Capo di", "Responsabile di", "Datore di lavoro di"],
+      },
+      {
+        forward: "assistente", inverse: "persona assistita",
+        forwardAliases: ["Assistito da"],
+        inverseAliases: ["Assistente di"],
+      },
+      {
+        forward: "soci", inverse: "soci",
+        forwardAliases: ["socio", "socia", "Socio di"],
+      },
+      {
+        forward: "cofondatori", inverse: "organizzazione cofondata",
+        forwardAliases: ["Co-fondato da"],
+        inverseAliases: ["Co-fondatore di"],
+      },
+      {
+        forward: "fornitore", inverse: "clienti",
+        forwardAliases: ["Cliente di"],
+        inverseAliases: ["cliente", "Provider di", "Fornitore di"],
+      },
+      {
+        forward: "predecessore", inverse: "successore",
+        forwardAliases: ["Successore di"],
+        inverseAliases: ["Predecessore di"],
+      },
     ],
-
     education: [
-      { forward: "Insegnante di", inverse: "Studente di" },
-      { forward: "Studente di", inverse: "Insegnante di" },
-      { forward: "Professore di", inverse: "Alunno di" },
-      { forward: "Alunno di", inverse: "Professore di" },
-      { forward: "Mentore di", inverse: "Allievo di" },
-      { forward: "Allievo di", inverse: "Mentore di" },
-      { forward: "Compagno di classe di", inverse: "Compagno di classe di" },
-      { forward: "Compagno di scuola di", inverse: "Compagno di scuola di" },
-      { forward: "Maestro di", inverse: "Apprendista di" },
-      { forward: "Apprendista di", inverse: "Maestro di" },
+      {
+        forward: "insegnante", inverse: "studenti",
+        forwardAliases: ["professore", "professoressa", "Studente di", "Alunno di"],
+        inverseAliases: ["studente", "studentessa", "Insegnante di", "Professore di"],
+      },
+      {
+        forward: "mentore", inverse: "allievi",
+        forwardAliases: ["Allievo di"],
+        inverseAliases: ["allievo", "allieva", "Mentore di"],
+      },
+      {
+        forward: "compagni di classe", inverse: "compagni di classe",
+        forwardAliases: ["Compagno di classe di"],
+      },
+      {
+        forward: "compagni di scuola", inverse: "compagni di scuola",
+        forwardAliases: ["Compagno di scuola di"],
+      },
+      {
+        forward: "maestro", inverse: "apprendisti",
+        forwardAliases: ["Apprendista di"],
+        inverseAliases: ["apprendista", "Maestro di"],
+      },
     ],
-
     creative: [
-      { forward: "Collaboratore di", inverse: "Collaboratore di" },
-      { forward: "Ispirato da", inverse: "Ispirazione per" },
-      { forward: "Ispirazione per", inverse: "Ispirato da" },
-      { forward: "Influenzato da", inverse: "Ha influenzato" },
-      { forward: "Ha influenzato", inverse: "Influenzato da" },
-      { forward: "Compagno di band di", inverse: "Compagno di band di" },
-      { forward: "Compagno di squadra di", inverse: "Compagno di squadra di" },
+      {
+        forward: "collaborazioni", inverse: "collaborazioni",
+        forwardAliases: ["collaboratore", "collaboratrice", "Collaboratore di"],
+      },
+      {
+        forward: "ispirazione", inverse: "persone ispirate",
+        forwardAliases: ["Ispirato da"],
+        inverseAliases: ["Ispirazione per"],
+      },
+      {
+        forward: "influenze", inverse: "persone influenzate",
+        forwardAliases: ["Influenzato da"],
+        inverseAliases: ["Ha influenzato"],
+      },
+      {
+        forward: "compagni di band", inverse: "compagni di band",
+        forwardAliases: ["Compagno di band di"],
+      },
+      {
+        forward: "compagni di squadra", inverse: "compagni di squadra",
+        forwardAliases: ["Compagno di squadra di"],
+      },
     ],
-
     misc: [
-      { forward: "Imparentato con", inverse: "Imparentato con" },
-      { forward: "Conosce", inverse: "Conosciuto da" },
-      { forward: "Conosciuto da", inverse: "Conosce" },
-      { forward: "Presentato da", inverse: "Ha presentato" },
-      { forward: "Ha presentato", inverse: "Presentato da" },
-      { forward: "Compagno di", inverse: "Compagno di" },
-      { forward: "Tutore di", inverse: "Protetto di" },
-      { forward: "Protetto di", inverse: "Tutore di" },
-      { forward: "Membro di", inverse: "Ha membro" },
-      { forward: "Ha membro", inverse: "Membro di" },
-      { forward: "Appartiene a", inverse: "Proprietario di" },
-      { forward: "Proprietario di", inverse: "Appartiene a" },
-      { forward: "Creato da", inverse: "Creatore di" },
-      { forward: "Creatore di", inverse: "Creato da" },
-      { forward: "Fondato da", inverse: "Fondatore di" },
-      { forward: "Fondatore di", inverse: "Fondato da" },
+      {
+        forward: "parentela", inverse: "parentela",
+        forwardAliases: ["Imparentato con"],
+      },
+      {
+        forward: "conosce", inverse: "conosciuto da",
+      },
+      {
+        forward: "presentato da", inverse: "ha presentato",
+      },
+      {
+        forward: "tutore", inverse: "persone tutelate",
+        forwardAliases: ["Protetto di"],
+        inverseAliases: ["Tutore di"],
+      },
+      {
+        forward: "organizzazione", inverse: "membri",
+        forwardAliases: ["Membro di"],
+        inverseAliases: ["Ha membro"],
+      },
+      {
+        forward: "proprietario", inverse: "beni",
+        forwardAliases: ["Appartiene a"],
+        inverseAliases: ["Proprietario di"],
+      },
+      {
+        forward: "autore", inverse: "opere",
+        forwardAliases: ["Creato da"],
+        inverseAliases: ["Creatore di"],
+      },
+      {
+        forward: "fondatori", inverse: "organizzazione fondata",
+        forwardAliases: ["Fondato da"],
+        inverseAliases: ["Fondatore di"],
+      },
     ],
   },
 };

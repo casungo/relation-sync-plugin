@@ -1,143 +1,65 @@
-/* ── Scrollable list container ─────────────────────────────── */
-.relation-sync-list {
-  max-height: 55vh;
-  overflow-y: auto;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m, 8px);
-  padding: 6px;
-  margin-top: 6px;
-}
-
-/* ── Count label ───────────────────────────────────────────── */
-.relation-sync-count {
-  font-size: var(--font-ui-smaller);
+/* Settings use Obsidian's existing typography and controls. */
+.relation-sync-status {
+  margin: 8px 0 16px;
   color: var(--text-muted);
-  padding: 4px 0;
-  text-align: right;
 }
-
-/* ── Category accordion ────────────────────────────────────── */
-.relation-sync-category {
-  margin-bottom: 4px;
-  border-radius: var(--radius-s, 6px);
-  overflow: hidden;
-}
-
-.relation-sync-category > summary {
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: var(--radius-s, 6px);
+.relation-sync-start {
+  margin: 16px 0;
+  padding: 16px;
+  border-radius: var(--radius-m, 8px);
   background: var(--background-secondary);
-  font-weight: 600;
+}
+.relation-sync-start p { margin-top: 0; }
+.relation-sync-examples {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.relation-sync-examples pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-size: var(--font-ui-small);
-  user-select: none;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  transition: background 0.15s ease;
 }
-.relation-sync-category > summary::-webkit-details-marker { display: none; }
-.relation-sync-category > summary::before {
-  content: "▸";
-  display: inline-block;
-  margin-right: 6px;
-  transition: transform 0.15s ease;
+.relation-sync-count { margin: 8px 0; color: var(--text-muted); }
+.relation-sync-category { margin: 12px 0; }
+.relation-sync-category > summary,
+.relation-sync-advanced > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+  font-weight: 600;
 }
-.relation-sync-category[open] > summary::before {
-  transform: rotate(90deg);
-}
-.relation-sync-category > summary:hover {
-  background: var(--background-modifier-hover);
-}
-
-.relation-sync-cat-count {
-  opacity: 0.45;
-  font-weight: 400;
-}
-
-.relation-sync-cat-actions {
-  margin-left: auto;
-  display: inline-flex;
-  gap: 4px;
-}
-
-.relation-sync-cat-button {
-  height: 24px;
-  padding: 0 8px;
-  font-size: var(--font-ui-smaller);
-  white-space: nowrap;
-}
-
-.relation-sync-rows {
-  padding: 2px 0 2px 8px;
-}
-
-/* ── Compact pair row ──────────────────────────────────────── */
-.relation-sync-list .relation-sync-rows > .relation-sync-row.setting-item {
-  padding: 2px 4px;
-  border-bottom: none;
-  min-height: unset;
-}
-.relation-sync-list .relation-sync-rows > .relation-sync-row.setting-item .setting-item-info {
-  display: none;
-}
-.relation-sync-row .setting-item-control {
-  width: 100%;
-  gap: 4px;
-  flex-wrap: nowrap;
-}
-.relation-sync-row .setting-item-control input[type="text"] {
-  flex: 1;
-  min-width: 0;
-  padding: 4px 8px;
-  font-size: var(--font-ui-smaller);
-}
-
-/* ── Disabled row ──────────────────────────────────────────── */
-.relation-sync-row--disabled .setting-item-control input[type="text"] {
-  opacity: 0.4;
-  text-decoration: line-through;
-}
-
-.relation-sync-row--invalid {
-  border-left: 3px solid var(--text-warning);
-}
-
+.relation-sync-row .setting-item-info { min-width: 0; }
+.relation-sync-row .setting-item-name,
+.relation-sync-row .setting-item-description { overflow-wrap: anywhere; }
+.relation-sync-row .setting-item-control { flex-wrap: wrap; gap: 8px; }
+.relation-sync-row button,
+.relation-sync-panel button { min-height: 40px; }
+.relation-sync-row .clickable-icon { min-width: 40px; min-height: 40px; }
+.relation-sync-advanced { margin: 24px 0; }
 .relation-sync-validation {
-  color: var(--text-warning);
-  font-size: var(--font-ui-smaller);
+  color: var(--text-error);
+  white-space: pre-wrap;
 }
-
 .relation-sync-warning {
-  margin: 8px 0;
-  padding: 8px 10px;
+  padding: 12px;
   border-left: 3px solid var(--text-warning);
-  background: var(--background-modifier-error-hover);
+  background: var(--background-secondary);
   color: var(--text-normal);
+}
+.relation-sync-link-state {
+  color: var(--text-muted);
   font-size: var(--font-ui-small);
+  margin: 4px 0 8px;
 }
-
-.relation-sync-warning-title {
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
-/* ── Arrow ─────────────────────────────────────────────────── */
-.relation-sync-arrow {
-  align-self: center;
-  margin: 0 2px;
-  opacity: 0.4;
-  flex-shrink: 0;
-  font-size: var(--font-ui-smaller);
-}
-
-/* ── Empty state ───────────────────────────────────────────── */
-.relation-sync-empty {
-  text-align: center;
-  opacity: 0.45;
-  padding: 32px 16px;
-  font-size: var(--font-ui-small);
+.relation-sync-panel-note { overflow-wrap: anywhere; color: var(--text-muted); }
+@media (max-width: 600px) {
+  .relation-sync-examples { grid-template-columns: 1fr; }
+  .relation-sync-row.setting-item { flex-direction: column; align-items: stretch; gap: 12px; }
+  .relation-sync-row .setting-item-control { justify-content: flex-start; }
+  .relation-sync-row button,
+  .relation-sync-row .clickable-icon,
+  .relation-sync-panel button { min-height: 44px; }
 }
 
 /* ── Sync log table ────────────────────────────────────────── */
@@ -185,8 +107,8 @@
 
 .relation-sync-panel-item {
   border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s, 6px);
-  padding: 8px;
+  border-radius: var(--radius-m, 8px);
+  padding: 16px;
   background: var(--background-primary);
 }
 
