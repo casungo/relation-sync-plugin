@@ -91,6 +91,12 @@ The plugin replaces unmodified bundled presets with the English and Italian cata
 
 New role groups are enabled when their legacy names were enabled. A new preset that conflicts with a custom mapping stays off. Review the updated catalog after the migration notice: grouped synonyms now share one switch, rather than separate switches for each spelling. Edited pairs that no longer match an old preset remain custom pairs, regardless of their language.
 
+## Note and clipboard access
+
+Relation Sync enumerates Markdown notes to track relations, preview a vault-wide sync, and update links after renames. Exclusion rules limit which notes the sync engine processes. It modifies frontmatter through Obsidian's API after the applicable sync controls and preview checks.
+
+The report's copy button writes the report to the clipboard. The plugin never reads the clipboard and makes no network requests.
+
 ## Install
 
 In Obsidian, open **Settings → Community plugins → Browse**, search for `Relation Sync`, install and enable it.
@@ -100,11 +106,11 @@ For manual installation, copy `main.js`, `manifest.json` and `styles.css` from a
 ## Development
 
 ```sh
-npm install
-npm test
-npm run lint
-npm run build
+npm ci
+npm run check
 ```
+
+The [review checklist](docs/review-readiness.md) explains the local checks, the hosted preview scan, and release asset verification.
 
 `npm run dev` watches the TypeScript source. Tests cover neutral aliases, inverse removals, target changes, bulk idempotence, exclusions, missing targets, cancellation, undo and settings migration. Browser and real-vault verification are separate from these tests.
 

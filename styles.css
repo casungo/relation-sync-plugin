@@ -171,3 +171,8 @@
   padding: 24px 4px;
   text-align: center;
 }
+
+.relation-sync-editor,
+.relation-sync-example-row {
+  display: block;
+}

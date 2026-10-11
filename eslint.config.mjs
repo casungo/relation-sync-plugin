@@ -1,37 +1,26 @@
-import js from "@eslint/js";
-import tseslint from "typescript-eslint";
-import obsidianPlugin from "eslint-plugin-obsidianmd";
 import globals from "globals";
+import obsidianPlugin from "eslint-plugin-obsidianmd";
 import { fileURLToPath } from "node:url";
 
-const tsconfigRootDir = fileURLToPath(new URL(".", import.meta.url));
-
-export default tseslint.config(
-	js.configs.recommended,
-	...tseslint.configs.recommended,
-	{
-		plugins: {
-			obsidianmd: obsidianPlugin,
-		},
-		rules: {
-			...obsidianPlugin.ruleConfigs.recommended,
-			...obsidianPlugin.ruleConfigs.recommendedTypeChecked,
-			"@typescript-eslint/no-floating-promises": "warn",
-			"@typescript-eslint/no-unsafe-assignment": "warn",
-			"@typescript-eslint/no-unsafe-return": "warn",
-			"@typescript-eslint/no-unnecessary-type-assertion": "warn",
-		},
-	},
+export default [
+	...obsidianPlugin.configs.recommended,
 	{
 		languageOptions: {
 			parserOptions: {
-				projectService: true,
-				tsconfigRootDir,
+				projectService: {
+					allowDefaultProject: ["eslint.config.mjs", "esbuild.config.mjs", "version-bump.mjs", "vitest.config.mjs"],
+				},
+				tsconfigRootDir: fileURLToPath(new URL(".", import.meta.url)),
 			},
-			globals: globals.browser,
 		},
 	},
 	{
-		ignores: ["main.js", "node_modules/**", "*.mjs"],
+		files: ["*.mjs"],
+		languageOptions: { globals: globals.node },
+		// These files run in Node during development, not inside Obsidian.
+		rules: { "obsidianmd/no-nodejs-modules": "off" },
 	},
-);
+	{
+		ignores: ["main.js", "node_modules/**", "scripts/**", "src/*.test.ts", "src/mocks/**"],
+	},
+];

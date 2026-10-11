@@ -23,9 +23,7 @@ jobs:
       - name: Build plugin
         run: |
           npm ci
-          npm run lint
-          npm test
-          npm run build
+          npm run check
 
       - name: Attest release asset provenance
         uses: actions/attest@v4
@@ -35,20 +33,24 @@ jobs:
             manifest.json
             styles.css
 
-      - name: Create release
+      - name: Verify attestations
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
+          for asset in main.js manifest.json styles.css; do
+            gh attestation verify "$asset" --repo "$GITHUB_REPOSITORY"
+          done
 
-          if [ -f styles.css ]; then
-            gh release create "$tag" \
-              --title="$tag" \
-              --generate-notes \
-              main.js manifest.json styles.css
-          else
-            gh release create "$tag" \
-              --title="$tag" \
-              --generate-notes \
-              main.js manifest.json
-          fi
+      - name: Publish verified release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          gh release create "$tag" --draft --verify-tag --title="$tag" --generate-notes \
+            main.js manifest.json styles.css
+          gh release download "$tag" --dir "$RUNNER_TEMP/release-assets" \
+            --pattern main.js --pattern manifest.json --pattern styles.css
+          for asset in main.js manifest.json styles.css; do
+            cmp "$asset" "$RUNNER_TEMP/release-assets/$asset"
+          done
+          gh release edit "$tag" --draft=false

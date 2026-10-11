@@ -17,10 +17,9 @@ Avoid sharing private vault content. Reduced examples with placeholder note name
 ## Development Setup
 
 1. Clone the repository.
-2. Run `npm install`.
+2. Run `npm ci`.
 3. Run `npm run dev` while developing.
-4. Run `npm run lint` before submitting TypeScript or JavaScript changes.
-5. Run `npm run build` before submitting behavior changes.
+4. Run `npm run check` before submitting changes or preparing a release. This runs lint with zero warnings, audits dependencies, runs tests, and verifies release metadata and build reproducibility.
 
 The source code is in `src/`. Obsidian loads the built plugin from `main.js`.
 
@@ -44,3 +43,5 @@ User-facing copy should be added to the locale system rather than hard-coded. Wh
 ## Release Changes
 
 Do not hard-code current version numbers in documentation. Version-specific changes belong in `manifest.json`, `versions.json`, package metadata, changelogs, or release notes.
+
+Before publishing, follow [Check before publishing](docs/review-readiness.md), including the hosted Review branch preview and Obsidian settings checks. CI and the release workflow enforce the local checks. The release workflow verifies attestations and downloaded draft assets before publishing.

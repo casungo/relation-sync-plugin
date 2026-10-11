@@ -1,4 +1,4 @@
-import { type App, Modal, Notice, PluginSettingTab, Setting, TFile } from "obsidian";
+import { type App, type ButtonComponent, Modal, Notice, PluginSettingTab, Setting, TFile, requireApiVersion, type SettingDefinitionItem } from "obsidian";
 import type RelationSyncPlugin from "./main";
 import { type RelationPair } from "./types";
 import { type BulkSyncPlan, type BulkSyncProgress, type SyncLogEntry, SyncEngine } from "./sync-engine";
@@ -12,6 +12,12 @@ import {
 } from "./locales";
 import { relationKeys } from "./relation-map";
 import { enablePresetPairs } from "./settings";
+
+function destructiveButton(button: ButtonComponent): ButtonComponent {
+  if (requireApiVersion("1.13.0")) button.setDestructive();
+  else button.setClass("mod-warning");
+  return button;
+}
 
 // ── Category helpers ─────────────────────────────────────────────────────
 
@@ -111,7 +117,7 @@ class ConfirmModal extends Modal {
     this.contentEl.createEl("p", { text: this.message });
     new Setting(this.contentEl)
       .addButton(btn => btn.setButtonText(strings.cancelButton).onClick(() => this.close()))
-      .addButton(btn => btn.setButtonText(strings.confirmButton).setWarning().onClick(() => {
+      .addButton(btn => destructiveButton(btn).setButtonText(strings.confirmButton).onClick(() => {
         this.onConfirm();
         this.close();
       }));
@@ -184,10 +190,9 @@ class BulkSyncPreviewModal extends Modal {
     new Setting(contentEl)
       .addButton((btn) => btn.setButtonText(strings.cancelButton).onClick(() => this.close()))
       .addButton((btn) =>
-        btn
+        destructiveButton(btn)
           .setButtonText(this.undo ? strings.undoLastSyncButton : strings.confirmBulkSyncButton)
           .setDisabled(this.plan.entries.length === 0)
-          .setWarning()
           .onClick(() => {
             this.onConfirm();
             this.close();
@@ -219,7 +224,7 @@ class BulkSyncRunningModal extends Modal {
       cls: "setting-item-description",
     });
     new Setting(this.contentEl).addButton((btn) =>
-      btn.setButtonText(strings.cancelButton).setWarning().onClick(() => {
+      destructiveButton(btn).setButtonText(strings.cancelButton).onClick(() => {
         this.onCancel();
       }),
     );
@@ -333,7 +338,116 @@ export class RelationSyncSettingTab extends PluginSettingTab {
 
   constructor(app: App, plugin: RelationSyncPlugin) { super(app, plugin); this.plugin = plugin; }
 
-  display(): void {
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    const strings = t();
+    const state = this.plugin.engine.getState();
+    return [
+      { type: "group", heading: strings.pluginTitle, items: [
+        { name: strings.pluginDescription, desc: state === "ready" ? strings.stateReady : state === "paused" ? strings.statePaused : strings.stateBlocked },
+        { name: strings.syncEnabled, desc: strings.syncEnabledDesc, render: (setting) => {
+          setting.addToggle((toggle) => toggle.setValue(this.plugin.settings.syncEnabled).onChange(async (value) => {
+            this.plugin.settings.syncEnabled = value;
+            await this.plugin.saveSettings();
+            this.refreshSettings();
+          }));
+        } },
+      ] },
+      { type: "group", heading: strings.firstRunTitle, cls: "relation-sync-start", items: [
+        { name: strings.firstRunDesc, render: (setting) => {
+          setting.settingEl.addClass("relation-sync-example-row");
+          this.renderExamples(setting.settingEl);
+        } },
+        { name: strings.checkCurrentNote, desc: strings.checkCurrentNoteDesc, render: (setting) => {
+          setting.addButton((btn) => btn.setButtonText(strings.checkCurrentNote).setCta().onClick(() => this.previewCurrent()));
+        } },
+      ] },
+      { name: strings.relationsHeading, desc: strings.aliasesDesc,
+        aliases: [strings.languageFilter, strings.filterRelations, strings.addPairButton,
+          ...this.plugin.settings.relations.flatMap((pair) => [...relationKeys(pair, "forward"), ...relationKeys(pair, "inverse")])],
+        render: (setting) => {
+          setting.settingEl.addClass("relation-sync-editor");
+          this.renderRelationEditor(setting.settingEl);
+        },
+      },
+      { type: "group", heading: strings.advancedHeading, items: [
+        { name: strings.syncVault, desc: strings.syncVaultDesc, render: (setting) => {
+          setting.addButton((btn) => btn.setButtonText(strings.syncVaultButton).onClick(() =>
+            showSyncPreview(this.app, this.plugin.engine, undefined, () => this.refreshSettings())));
+        } },
+        { name: strings.viewRecentLog, desc: strings.viewRecentLogDesc, render: (setting) => {
+          setting.addButton((btn) => btn.setButtonText(strings.viewRecentLogButton).onClick(() =>
+            new SyncLogModal(this.app, this.plugin.engine.getRecentLog()).open()));
+        } },
+        { name: strings.undoLastSync, desc: strings.undoSessionDesc, render: (setting) => {
+          setting.addButton((btn) => btn.setButtonText(strings.undoLastSyncButton)
+            .setDisabled(!this.plugin.engine.canUndoLastSync()).onClick(() => this.previewUndo()));
+        } },
+        { name: strings.excludePaths, desc: strings.excludePathsDesc, render: (setting) => {
+          setting.addText((text) => {
+            text.setValue(this.plugin.settings.excludePaths).setPlaceholder(strings.excludePathsPlaceholder)
+              .onChange(async (value) => { this.plugin.settings.excludePaths = value; await this.plugin.saveSettings(); });
+            text.inputEl.setAttribute("aria-label", strings.excludePaths);
+          });
+        } },
+        { name: strings.languagePresets, desc: strings.languagePresetsDesc, render: (setting) => {
+          setting.addButton((btn) => btn.setButtonText(strings.enableEnglish).onClick(() => void this.enablePreset("en")))
+            .addButton((btn) => btn.setButtonText(strings.enableItalian).onClick(() => void this.enablePreset("it")));
+        } },
+        { name: strings.exportPairs, desc: strings.exportPairsDesc, render: (setting) => {
+          setting.addButton((btn) => btn.setButtonText(strings.exportPairsButton).onClick(() => void this.exportPairs()));
+        } },
+        { name: strings.importPairs, desc: strings.importPairsDesc, render: (setting) => {
+          setting.addButton((btn) => btn.setButtonText(strings.importPairsButton).onClick(() => this.importPairs()));
+        } },
+        { name: strings.resetToDefaults, desc: strings.resetToDefaultsDesc, render: (setting) => {
+          setting.addButton((btn) => destructiveButton(btn).setButtonText(strings.resetToDefaultsButton).onClick(() => this.confirmReset()));
+        } },
+      ] },
+    ];
+  }
+
+  private refreshSettings(): void {
+    if (requireApiVersion("1.13.0")) this.update();
+    else this.renderLegacySettings();
+  }
+
+  display(): void { this.renderLegacySettings(); }
+
+  private renderExamples(container: HTMLElement): void {
+    const strings = t();
+    const examples = container.createDiv({ cls: "relation-sync-examples" });
+    for (const [name, key, target] of [[strings.exampleSource, strings.exampleForward, strings.exampleTarget],
+      [strings.exampleTarget, strings.exampleInverse, strings.exampleSource]]) {
+      const example = examples.createDiv();
+      example.createEl("strong", { text: name });
+      example.createEl("pre", { text: `---\n${key}: "[[${target?.replace(/\.md$/, "")}]]"\n---` });
+    }
+  }
+
+  private renderRelationEditor(container: HTMLElement): void {
+    const strings = t();
+    new Setting(container).setName(strings.languageFilter).addDropdown((dropdown) =>
+      dropdown.addOptions({ all: strings.allLanguages, en: "English", it: "Italiano" }).setValue(this.languageFilter)
+        .onChange((value) => { this.languageFilter = value; this.renderRelations(listEl, countEl); }));
+    new Setting(container).setName(strings.filterRelations).addSearch((search) => {
+      search.setValue(this.searchQuery).setPlaceholder(strings.searchPlaceholder)
+        .onChange((value) => { this.searchQuery = value; this.renderRelations(listEl, countEl); });
+      search.inputEl.setAttribute("aria-label", strings.filterRelations);
+    }).addButton((btn) => btn.setButtonText(strings.addPairButton).onClick(() => this.editPair()));
+    const countEl = container.createDiv({ cls: "relation-sync-count" });
+    const listEl = container.createDiv({ cls: "relation-sync-list" });
+    this.renderRelations(listEl, countEl);
+  }
+
+  private confirmReset(): void {
+    const strings = t();
+    new ConfirmModal(this.app, strings.resetConfirm, () => {
+      this.plugin.settings.relations = getDefaultRelations();
+      void this.plugin.saveSettings().then(() => { new Notice(strings.resetNotice); this.refreshSettings(); });
+    }).open();
+  }
+
+  private renderLegacySettings(): void {
     const { containerEl } = this;
     const strings = t();
     const scrollTop = containerEl.scrollTop;
@@ -357,28 +471,12 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     const start = containerEl.createDiv({ cls: "relation-sync-start" });
     new Setting(start).setName(strings.firstRunTitle).setHeading();
     start.createEl("p", { text: strings.firstRunDesc });
-    const examples = start.createDiv({ cls: "relation-sync-examples" });
-    for (const [name, key, target] of [[strings.exampleSource, strings.exampleForward, strings.exampleTarget],
-      [strings.exampleTarget, strings.exampleInverse, strings.exampleSource]]) {
-      const example = examples.createDiv();
-      example.createEl("strong", { text: name });
-      example.createEl("pre", { text: `---\n${key}: "[[${target?.replace(/\.md$/, "")}]]"\n---` });
-    }
+    this.renderExamples(start);
     new Setting(start).setName(strings.checkCurrentNote).setDesc(strings.checkCurrentNoteDesc).addButton((btn) =>
       btn.setButtonText(strings.checkCurrentNote).setCta().onClick(() => this.previewCurrent()));
 
     new Setting(containerEl).setName(strings.relationsHeading).setDesc(strings.aliasesDesc).setHeading();
-    new Setting(containerEl).setName(strings.languageFilter).addDropdown((dropdown) =>
-      dropdown.addOptions({ all: strings.allLanguages, en: "English", it: "Italiano" }).setValue(this.languageFilter)
-        .onChange((value) => { this.languageFilter = value; this.renderRelations(listEl, countEl); }));
-    new Setting(containerEl).setName(strings.filterRelations).addSearch((search) => {
-      search.setValue(this.searchQuery).setPlaceholder(strings.searchPlaceholder)
-        .onChange((value) => { this.searchQuery = value; this.renderRelations(listEl, countEl); });
-      search.inputEl.setAttribute("aria-label", strings.filterRelations);
-    }).addButton((btn) => btn.setButtonText(strings.addPairButton).onClick(() => this.editPair()));
-    const countEl = containerEl.createDiv({ cls: "relation-sync-count" });
-    const listEl = containerEl.createDiv({ cls: "relation-sync-list" });
-    this.renderRelations(listEl, countEl);
+    this.renderRelationEditor(containerEl);
 
     const advanced = containerEl.createEl("details", { cls: "relation-sync-advanced" });
     advanced.open = this.advancedOpen;
@@ -386,7 +484,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     advanced.createEl("summary", { text: strings.advancedHeading });
     const tools = advanced.createDiv();
     new Setting(tools).setName(strings.syncVault).setDesc(strings.syncVaultDesc).addButton((btn) =>
-      btn.setButtonText(strings.syncVaultButton).onClick(() => showSyncPreview(this.app, this.plugin.engine, undefined, () => this.display())));
+      btn.setButtonText(strings.syncVaultButton).onClick(() => showSyncPreview(this.app, this.plugin.engine, undefined, () => this.refreshSettings())));
     new Setting(tools).setName(strings.viewRecentLog).setDesc(strings.viewRecentLogDesc).addButton((btn) =>
       btn.setButtonText(strings.viewRecentLogButton).onClick(() => new SyncLogModal(this.app, this.plugin.engine.getRecentLog()).open()));
     new Setting(tools).setName(strings.undoLastSync).setDesc(strings.undoSessionDesc).addButton((btn) =>
@@ -404,18 +502,15 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     new Setting(tools).setName(strings.importPairs).setDesc(strings.importPairsDesc).addButton((btn) =>
       btn.setButtonText(strings.importPairsButton).onClick(() => this.importPairs()));
     new Setting(tools).setName(strings.resetToDefaults).setDesc(strings.resetToDefaultsDesc).addButton((btn) =>
-      btn.setButtonText(strings.resetToDefaultsButton).setWarning().onClick(() => {
-        new ConfirmModal(this.app, strings.resetConfirm, () => {
-          this.plugin.settings.relations = getDefaultRelations();
-          void this.plugin.saveSettings().then(() => { new Notice(strings.resetNotice); this.display(); });
-        }).open();
+      destructiveButton(btn).setButtonText(strings.resetToDefaultsButton).onClick(() => {
+        this.confirmReset();
       }));
   }
 
   private previewCurrent(): void {
     const file = this.app.workspace.getActiveFile();
     if (!(file instanceof TFile) || file.extension !== "md") { new Notice(t().noActiveNote); return; }
-    showSyncPreview(this.app, this.plugin.engine, file, () => this.display());
+    showSyncPreview(this.app, this.plugin.engine, file, () => this.refreshSettings());
   }
 
   private previewUndo(): void {
@@ -428,7 +523,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
       void this.plugin.engine.undoLastSync(entries).then((result) => {
         new Notice(t().undoLastSyncNotice(result.count));
         new SyncLogModal(this.app, result.log).open();
-        this.display();
+        this.refreshSettings();
       }).catch((error: unknown) => new Notice(error instanceof Error ? error.message : t().bulkSyncFailedNotice));
     }, true).open();
   }
@@ -437,7 +532,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     new PairEditModal(this.app, this.plugin.settings.relations, index, async (pair) => {
       if (index === undefined) this.plugin.settings.relations.push(pair); else this.plugin.settings.relations[index] = pair;
       await this.plugin.saveSettings();
-      this.display();
+      this.refreshSettings();
     }).open();
   }
 
@@ -485,13 +580,13 @@ export class RelationSyncSettingTab extends PluginSettingTab {
               toggle.setValue(false); new Notice(errors.map((error) => error.message).join(" ")); return;
             }
             pair.enabled = value;
-            void this.plugin.saveSettings().then(() => this.display());
+            void this.plugin.saveSettings().then(() => this.refreshSettings());
           });
           toggle.toggleEl.setAttribute("aria-label", `${strings.pairEnabled}: ${pair.forward} ↔ ${pair.inverse}`);
         });
         row.addButton((btn) => btn.setButtonText(strings.editPair).onClick(() => this.editPair(index)))
           .addExtraButton((btn) => btn.setIcon("trash").setTooltip(strings.removePairTooltip).onClick(() => {
-            relations.splice(index, 1); void this.plugin.saveSettings().then(() => this.display());
+            relations.splice(index, 1); void this.plugin.saveSettings().then(() => this.refreshSettings());
           }));
         const errors = issues.filter((issue) => issue.index === index);
         if (errors.length > 0) {
@@ -506,7 +601,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     this.plugin.settings.relations = relations;
     await this.plugin.saveSettings();
     if (skipped > 0) new Notice(t().presetConflicts(skipped));
-    this.display();
+    this.refreshSettings();
   }
 
   private async exportPairs(): Promise<void> {
@@ -575,7 +670,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
           }
           await this.plugin.saveSettings();
           new Notice(skipped > 0 ? strings.duplicateImportSkipped(added, skipped) : strings.importSuccess(added));
-          this.display();
+          this.refreshSettings();
         } catch {
           new Notice(strings.importError);
         }

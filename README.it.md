@@ -89,4 +89,12 @@ Le vecchie coppie integrate vengono sostituite dal catalogo italiano e inglese. 
 
 Un gruppo nuovo viene abilitato quando erano abilitate le sue vecchie proprietà. I sinonimi ora condividono un interruttore. Controlla le coppie dopo l'avviso di migrazione. Una coppia modificata che non corrisponde più a un vecchio predefinito resta personalizzata, anche se è scritta in un'altra lingua.
 
+## Accesso alle note e agli appunti
+
+Relation Sync enumera le note Markdown per rilevare le relazioni, preparare l'anteprima dell'intero vault e aggiornare i link dopo una rinomina. Le esclusioni limitano le note elaborate dal motore. Il plugin modifica il frontmatter tramite le API di Obsidian, dopo i controlli di sincronizzazione e anteprima previsti.
+
+Il pulsante di copia del report scrive il report negli appunti. Il plugin non legge mai gli appunti e non effettua richieste di rete.
+
 Per installazione, sviluppo e segnalazioni consulta il [README inglese](README.md).
+
+Prima di pubblicare, segui i [controlli per la review](docs/review-readiness.md). `npm run check` richiede zero warning ESLint, zero vulnerabilità note nelle dipendenze, test riusciti, metadati coerenti e build riproducibile. Il workflow verifica attestazioni e asset scaricati dalla bozza prima di pubblicare. La scansione completa va provata anche dal portale Obsidian con **Review branch**.
