@@ -1,8 +1,8 @@
 {
 	"id": "relation-sync",
 	"name": "Relation Sync",
-	"version": "1.3.0",
-	"minAppVersion": "1.4.4",
+	"version": "1.3.1",
+	"minAppVersion": "1.7.2",
 	"description": "Automatically syncs inverse frontmatter relations. Define relation pairs like parent-child or spouse to keep both sides in sync.",
 	"author": "casungo",
 	"authorUrl": "https://casungo.top",

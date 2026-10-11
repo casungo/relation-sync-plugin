@@ -36,8 +36,7 @@ function vault(initial: Record<string, Record<string, unknown>>, relations = get
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.stubGlobal("activeWindow", globalThis);
-  vi.stubGlobal("window", { moment: { locale: () => "en" } });
+  vi.stubGlobal("window", { setTimeout, clearTimeout, moment: { locale: () => "en" } });
 });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
@@ -221,6 +220,15 @@ describe("automatic sync boundaries", () => {
     v.fm["Bobby.md"] = v.fm["Bob.md"]!;
     await v.engine.handleFileRenamed(target, "Bob.md");
     expect(v.fm["Alice.md"]).toEqual({ parent: "[[Bobby]]", unrelated: "[[Bob]]" });
+  });
+
+  it("preserves non-string relation array entries when renaming a target", async () => {
+    const v = vault({ "Alice.md": { parent: ["[[Bob#Bio|B]]", 42, null, { label: "keep" }] }, "Bob.md": {} });
+    const target = v.files[1]!;
+    target.path = "Bobby.md"; target.basename = "Bobby";
+    v.fm["Bobby.md"] = v.fm["Bob.md"]!;
+    await v.engine.handleFileRenamed(target, "Bob.md");
+    expect(v.fm["Alice.md"]).toEqual({ parent: ["[[Bobby#Bio|B]]", 42, null, { label: "keep" }] });
   });
 
   it("does not rewrite included notes when the renamed target is excluded", async () => {

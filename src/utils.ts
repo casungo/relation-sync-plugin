@@ -109,11 +109,11 @@ export function debounce<A extends unknown[]>(
   fn: (...args: A) => void,
   ms: number,
 ): ((...args: A) => void) & { cancel(): void } {
-  let timer: ReturnType<typeof activeWindow.setTimeout> | null = null;
+  let timer: number | null = null;
 
   const debounced = (...args: A): void => {
-    if (timer !== null) activeWindow.clearTimeout(timer);
-    timer = activeWindow.setTimeout(() => {
+    if (timer !== null) window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
       timer = null;
       fn(...args);
     }, ms);
@@ -121,10 +121,10 @@ export function debounce<A extends unknown[]>(
 
   debounced.cancel = (): void => {
     if (timer !== null) {
-      activeWindow.clearTimeout(timer);
+      window.clearTimeout(timer);
       timer = null;
     }
   };
 
-  return debounced as ((...args: A) => void) & { cancel(): void };
+  return debounced;
 }

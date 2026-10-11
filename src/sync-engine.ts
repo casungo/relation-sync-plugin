@@ -80,7 +80,7 @@ export class SyncEngine {
   private readonly writing = new Set<string>();
 
   /** Safety-net timers so a writing-guard can never leak forever. */
-  private readonly writingTimers = new Map<string, ReturnType<typeof activeWindow.setTimeout>>();
+  private readonly writingTimers = new Map<string, number>();
 
   /** Previous frontmatter snapshot per file path (for diffing). */
   private readonly prevFm = new Map<string, Record<string, unknown>>();
@@ -245,7 +245,7 @@ export class SyncEngine {
             if (typeof val === "string") {
               fmObj[key] = replaceWikiLinkTarget(val, oldLinkPath, newLinkPath, shouldReplaceTarget);
             } else if (Array.isArray(val)) {
-              fmObj[key] = val.map((item) =>
+              fmObj[key] = val.map((item: unknown) =>
                 typeof item === "string" ? replaceWikiLinkTarget(item, oldLinkPath, newLinkPath, shouldReplaceTarget) : item
               );
             }
@@ -393,7 +393,7 @@ export class SyncEngine {
     this.debouncedFlush.cancel();
     this.pendingQueue.length = 0;
     this.prevFm.clear();
-    for (const t of this.writingTimers.values()) activeWindow.clearTimeout(t);
+    for (const t of this.writingTimers.values()) window.clearTimeout(t);
     this.writingTimers.clear();
     this.writing.clear();
     this.bulkSyncAbort = true;
@@ -410,9 +410,9 @@ export class SyncEngine {
   private setWritingGuardTimer(path: string): void {
     // Clear any existing timer first
     const existing = this.writingTimers.get(path);
-    if (existing) activeWindow.clearTimeout(existing);
+    if (existing) window.clearTimeout(existing);
 
-    const t = activeWindow.setTimeout(() => {
+    const t = window.setTimeout(() => {
       this.writing.delete(path);
       this.writingTimers.delete(path);
     }, WRITING_GUARD_TTL);
@@ -424,7 +424,7 @@ export class SyncEngine {
     this.writing.delete(path);
     const t = this.writingTimers.get(path);
     if (t) {
-      activeWindow.clearTimeout(t);
+      window.clearTimeout(t);
       this.writingTimers.delete(path);
     }
   }
@@ -600,7 +600,7 @@ export class SyncEngine {
           const fm = cache?.frontmatter ?? {};
           const alreadyPresent = this.hasEquivalentLink(fm, change.key, change.link, target.path);
           const actualKey = findActualKey(fm, change.key);
-          const value = actualKey ? fm[actualKey] : undefined;
+          const value: unknown = actualKey ? fm[actualKey] : undefined;
           if (!alreadyPresent && value != null && typeof value !== "string" && !Array.isArray(value)) {
             problems.push({ file: target.path, key: actualKey ?? change.key, link: change.link, reason: "value" });
             continue;

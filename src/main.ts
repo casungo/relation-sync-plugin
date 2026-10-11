@@ -129,7 +129,7 @@ export default class RelationSyncPlugin extends Plugin {
   private async activateRelationPanel(): Promise<void> {
     const existingLeaf = this.app.workspace.getLeavesOfType(RELATION_PANEL_VIEW_TYPE)[0];
     if (existingLeaf) {
-      this.app.workspace.revealLeaf(existingLeaf);
+      await this.app.workspace.revealLeaf(existingLeaf);
       return;
     }
 
@@ -140,7 +140,7 @@ export default class RelationSyncPlugin extends Plugin {
       type: RELATION_PANEL_VIEW_TYPE,
       active: true,
     });
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
   }
 
 }

@@ -13,7 +13,14 @@ export default tseslint.config(
 		plugins: {
 			obsidianmd: obsidianPlugin,
 		},
-		rules: obsidianPlugin.configs.recommended,
+		rules: {
+			...obsidianPlugin.ruleConfigs.recommended,
+			...obsidianPlugin.ruleConfigs.recommendedTypeChecked,
+			"@typescript-eslint/no-floating-promises": "warn",
+			"@typescript-eslint/no-unsafe-assignment": "warn",
+			"@typescript-eslint/no-unsafe-return": "warn",
+			"@typescript-eslint/no-unnecessary-type-assertion": "warn",
+		},
 	},
 	{
 		languageOptions: {

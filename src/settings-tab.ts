@@ -338,7 +338,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
     const strings = t();
     const scrollTop = containerEl.scrollTop;
     containerEl.empty();
-    activeWindow.requestAnimationFrame(() => { containerEl.scrollTop = scrollTop; });
+    window.requestAnimationFrame(() => { containerEl.scrollTop = scrollTop; });
     new Setting(containerEl).setName(strings.pluginTitle).setDesc(strings.pluginDescription).setHeading();
     const statusEl = containerEl.createDiv({ cls: "relation-sync-status" });
     statusEl.setAttribute("role", "status");
@@ -535,7 +535,7 @@ export class RelationSyncSettingTab extends PluginSettingTab {
 
   private importPairs(): void {
     const strings = t();
-    const input = document.createElement("input");
+    const input = createEl("input");
     input.type = "file";
     input.accept = ".json";
     input.onchange = () => {
